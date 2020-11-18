@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <title>Liste paiements</title>
+    <link rel="stylesheet" th:href="@{/style/list.css}"/>
+    <link rel="shortcut icon" th:href="@{/images/favicon.ico}" type="image/x-icon"/>
+    <meta content="width=device-width, initial-scale=1" name="viewport"/>
+</head>
+<body>
+<div class="main">
+    <h1>Liste des paiements reçus via Hello Asso</h1>
+    <div class="align-div">
+        <div>
+            <div class="right logout" id="out">
+                <form method="POST" th:action="@{/logout}">
+                    <input type="submit" value="Se déconnecter"/>
+                </form>
+            </div>
+            <br>
+            <br>
+        </div>
+    </div>
+
+    <div>
+        <table class="blueTable">
+            <tr class="header">
+                <th>Id</th>
+                <th>Date</th>
+                <th>Montant</th>
+                <th>Nom</th>
+                <th>Prenom</th>
+                <th>Statut</th>
+                <th>Erreur</th>
+                <th width="10%">Action</th>
+            </tr>
+            <tr th:each="payment : ${payments}">
+                <td th:text="${payment.id}">id</td>
+                <td th:text="${payment.date}">date</td>
+                <td th:text="${payment.amount}">montant Id</td>
+                <td th:text="${payment.payerLastName}">nom</td>
+                <td th:text="${payment.payerFirstName}">prenom</td>
+                <td th:text="${payment.status.label}">statut</td>
+                <td th:text="${payment.error}">error</td>
+                <td class="align-div">
+                    <form action="?delete" class="left" method="post">
+                        <input name="delete" th:src="@{/images/trash.svg}" type="image" width="25%"/>
+                        <input name="id" th:value="*{payment.id}" type="hidden">
+                    </form>
+                    <form action="?credit" class="right" method="post" th:if="${payment.status.label != 'Succès'}">
+                        <input name="credit" th:src="@{/images/pay.svg}" type="image" width="50%"/>
+                        <input name="id" th:value="*{payment.id}" type="hidden">
+                    </form>
+                    <img alt="Already done" th:if="${payment.status.label == 'Succès'}" th:src="@{/images/ok.svg}"
+                         width="15%">
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>
