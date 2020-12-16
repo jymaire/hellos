@@ -40,16 +40,6 @@ public class PaymentController {
         return "list";
     }
 
-    @RequestMapping(value = "/list", method = RequestMethod.POST)
-    public String creditAccount(@RequestParam(name = "id") Integer id, Model model) {
-        LOGGER.info("post ok sur {}", id);
-        ProcessResult processResult = new ProcessResult();
-        cyclosService.creditAccount(processResult, id);
-        List<Payment> all = paymentRepository.findAll();
-        model.addAttribute("payments", all);
-        return "redirect:/list";
-    }
-
     @Transactional
     @RequestMapping(value = "/list", method = RequestMethod.POST, params = "delete")
     public String delete(@RequestParam(name = "id") Integer id, Model model) {

@@ -12,6 +12,7 @@ public class HelloAssoPaymentNotificationBody {
     private HelloAssoAmount amount;
     private int id;
     private String date;
+    private String state;
 
     public HelloAssoPaymentNotificationBody() {
     }
@@ -56,6 +57,14 @@ public class HelloAssoPaymentNotificationBody {
         this.date = date;
     }
 
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
     @Override
     public String toString() {
         return "HelloAssoPaymentNotificationBody{" +
@@ -63,6 +72,7 @@ public class HelloAssoPaymentNotificationBody {
                 ", amount=" + amount +
                 ", id='" + id + '\'' +
                 ", date='" + date + '\'' +
+                ", state='" + state + '\'' +
                 '}';
     }
 }

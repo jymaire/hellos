@@ -13,6 +13,7 @@ import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotifica
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotificationBody;
 import org.lagonette.hellos.entity.Payment;
 import org.lagonette.hellos.repository.PaymentRepository;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -57,6 +58,40 @@ class HelloAssoServiceTest {
         helloAssoPaymentNotification = new HelloAssoPaymentNotification("Payment", mapper.writeValueAsString(helloAssoPaymentBody));
     }
 
+
+    @Test
+    void goodPayment() throws IOException {
+        // GIVEN
+        String helloAssoPaymentNotificationWrapper = "{\"data\": {\"payer\": {\"dateOfBirth\": \"1960-02-28T00:00:00+01:00\", \"email\": \"mail@mail.fr\", \"address\": \"28 Rue Republique\", \"city\": \"VILLEURBANNE\", \"zipCode\": \"69100\", \"country\": \"FRA\", \"firstName\": \"Prenom\", \"lastName\": \"Nom\"}, \"order\": {\"id\": 345, \"date\": \"2020-11-14T11:13:08.2972161+00:00\", \"formSlug\": \"form-slug-1\", \"formType\": \"PaymentForm\", \"organizationSlug\": \"orga\"}, \"items\": [{\"shareAmount\": 1500, \"shareItemAmount\": 15000, \"id\": 18124903, \"amount\": 1500, \"type\": \"Payment\", \"state\": \"Processed\"}], \"cashOutState\": \"Transfered\", \"paymentReceiptUrl\": \"https://www.helloasso.com/associations/orga/paiement\", \"id\": 11, \"amount\": 1500, \"date\": \"2020-11-14T11:13:11.6878813+00:00\", \"paymentMeans\": \"Card\", \"state\": \"Authorized\"}, \"eventType\": \"Payment\"}";
+        final HelloAssoPaymentNotification helloAssoPaymentNotification = mapper.readValue(helloAssoPaymentNotificationWrapper, HelloAssoPaymentNotification.class);
+
+        when(dotenv.get("HELLO_ASSO_FORM")).thenReturn("form-slug-1");
+        when(dotenv.get("HELLO_ASSO_MAX_AMOUNT")).thenReturn("250");
+
+        // WHEN
+        Map<Boolean, Notification> isValidPayment = helloAssoService.isValidPayment(helloAssoPaymentNotification);
+
+        // THEN
+        assertThat(isValidPayment.containsKey(true)).isTrue();
+    }
+
+
+    @Test
+    void wrongForm() throws IOException {
+        // GIVEN
+        String helloAssoPaymentNotificationWrapper = "{\"data\": {\"payer\": {\"dateOfBirth\": \"1960-02-28T00:00:00+01:00\", \"email\": \"mail@mail.fr\", \"address\": \"28 Rue Republique\", \"city\": \"VILLEURBANNE\", \"zipCode\": \"69100\", \"country\": \"FRA\", \"firstName\": \"Prenom\", \"lastName\": \"Nom\"}, \"order\": {\"id\": 345, \"date\": \"2020-11-14T11:13:08.2972161+00:00\", \"formSlug\": \"form-slug-1\", \"formType\": \"PaymentForm\", \"organizationSlug\": \"orga\"}, \"items\": [{\"shareAmount\": 1500, \"shareItemAmount\": 15000, \"id\": 18124903, \"amount\": 1500, \"type\": \"Payment\", \"state\": \"Processed\"}], \"cashOutState\": \"Transfered\", \"paymentReceiptUrl\": \"https://www.helloasso.com/associations/orga/paiement\", \"id\": 11, \"amount\": 1500, \"date\": \"2020-11-14T11:13:11.6878813+00:00\", \"paymentMeans\": \"Card\", \"state\": \"Authorized\"}, \"eventType\": \"Payment\"}";
+        final HelloAssoPaymentNotification helloAssoPaymentNotification = mapper.readValue(helloAssoPaymentNotificationWrapper, HelloAssoPaymentNotification.class);
+
+        when(dotenv.get("HELLO_ASSO_FORM")).thenReturn("form-slug");
+        when(dotenv.get("HELLO_ASSO_MAX_AMOUNT")).thenReturn("250");
+
+        // WHEN
+        Map<Boolean, Notification> isValidPayment = helloAssoService.isValidPayment(helloAssoPaymentNotification);
+
+        // THEN
+        assertThat(isValidPayment.containsKey(false)).isTrue();
+    }
+
     @Test
     void amountTooHigh() throws IOException {
         // GIVEN
@@ -73,6 +108,9 @@ class HelloAssoServiceTest {
         // THEN
         assertThat(isValidPayment.containsKey(false)).isTrue();
         verify(mailService).sendEmail(eq("mail@provider"), eq("[Hellos] Paiement dépassant la limite"), anyString());
+        ArgumentCaptor<Payment> argumentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(argumentCaptor.capture());
+        assertThat(argumentCaptor.getValue().getAmount()).isEqualTo(15000);
     }
 
 
@@ -92,6 +130,20 @@ class HelloAssoServiceTest {
         verifyNoInteractions(mailService);
     }
 
+    @Test
+    void wrongNotificationType() throws IOException {
+        // GIVEN
+        String helloAssoPaymentNotificationWrapper = "{\"data\": {\"payer\": {\"dateOfBirth\": \"1960-02-28T00:00:00+01:00\", \"email\": \"mail@mail.fr\", \"address\": \"28 Rue Republique\", \"city\": \"VILLEURBANNE\", \"zipCode\": \"69100\", \"country\": \"FRA\", \"firstName\": \"Prenom\", \"lastName\": \"Nom\"}, \"order\": {\"id\": 345, \"date\": \"2020-11-14T11:13:08.2972161+00:00\", \"formSlug\": \"form-slug-1\", \"formType\": \"PaymentForm\", \"organizationSlug\": \"orga\"}, \"items\": [{\"shareAmount\": 15000, \"shareItemAmount\": 15000, \"id\": 18124903, \"amount\": 1500000, \"type\": \"Payment\", \"state\": \"Processed\"}], \"cashOutState\": \"Transfered\", \"paymentReceiptUrl\": \"https://www.helloasso.com/associations/orga/paiement\", \"id\": 11, \"amount\": 1500, \"date\": \"2020-11-14T11:13:11.6878813+00:00\", \"paymentMeans\": \"Card\", \"state\": \"Authorized\"}, \"eventType\": \"Order\"}";
+        final HelloAssoPaymentNotification helloAssoPaymentNotification = mapper.readValue(helloAssoPaymentNotificationWrapper, HelloAssoPaymentNotification.class);
+
+        // WHEN
+        Map<Boolean, Notification> isValidPayment = helloAssoService.isValidPayment(helloAssoPaymentNotification);
+
+        // THEN
+        assertThat(isValidPayment.containsKey(false)).isTrue();
+        verifyNoInteractions(mailService);
+    }
+
 
     @Test
     void emptyNotification() throws IOException {
@@ -99,6 +151,20 @@ class HelloAssoServiceTest {
         helloAssoPaymentNotification = null;
         // WHEN
         Map<Boolean, Notification> isValidPayment = helloAssoService.isValidPayment(helloAssoPaymentNotification);
+        // THEN
+        assertThat(isValidPayment.containsKey(false)).isTrue();
+    }
+
+    @Test
+    void refusedPayment() throws IOException {
+        // GIVEN
+        String helloAssoPaymentNotificationWrapper = "{\"data\": {\"payer\": {\"dateOfBirth\": \"1960-02-28T00:00:00+01:00\", \"email\": \"mail@mail.fr\", \"address\": \"28 Rue Republique\", \"city\": \"VILLEURBANNE\", \"zipCode\": \"69100\", \"country\": \"FRA\", \"firstName\": \"Prenom\", \"lastName\": \"Nom\"}, \"order\": {\"id\": 345, \"date\": \"2020-11-14T11:13:08.2972161+00:00\", \"formSlug\": \"form-slug-1\", \"formType\": \"PaymentForm\", \"organizationSlug\": \"orga\"}, \"items\": [{\"shareAmount\": 1500, \"shareItemAmount\": 15000, \"id\": 18124903, \"amount\": 1500, \"type\": \"Payment\", \"state\": \"Processed\"}], \"cashOutState\": \"Transfered\", \"paymentReceiptUrl\": \"https://www.helloasso.com/associations/orga/paiement\", \"id\": 11, \"amount\": 1500, \"date\": \"2020-11-14T11:13:11.6878813+00:00\", \"paymentMeans\": \"Card\", \"state\": \"Refused\"}, \"eventType\": \"Payment\"}";
+        final HelloAssoPaymentNotification helloAssoPaymentNotification = mapper.readValue(helloAssoPaymentNotificationWrapper, HelloAssoPaymentNotification.class);
+        when(dotenv.get("HELLO_ASSO_MAX_AMOUNT")).thenReturn("250");
+
+        // WHEN
+        Map<Boolean, Notification> isValidPayment = helloAssoService.isValidPayment(helloAssoPaymentNotification);
+
         // THEN
         assertThat(isValidPayment.containsKey(false)).isTrue();
     }

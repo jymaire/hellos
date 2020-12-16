@@ -6,6 +6,7 @@ import org.lagonette.hellos.bean.ProcessResult;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.lagonette.hellos.service.CyclosService;
 import org.lagonette.hellos.service.HelloAssoService;
+import org.lagonette.hellos.service.PaymentService;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -26,6 +27,9 @@ class PaymentControllerTest {
     @Mock
     private HelloAssoService helloAssoService;
 
+    @Mock
+    private PaymentService paymentService;
+
     @InjectMocks
     private PaymentController paymentController;
 
@@ -42,14 +46,11 @@ class PaymentControllerTest {
     @Test
     void shouldCreditAccount() {
         // WHEN
-        paymentController.creditAccount(2, new ConcurrentModel());
+        paymentController.credit(2, new ConcurrentModel());
         ProcessResult processResult = new ProcessResult();
 
         // THEN
-        verify(cyclosService).creditAccount(processResult, 2);
-        verify(paymentRepository).findAll();
-        verifyNoMoreInteractions(paymentRepository);
-        verifyNoMoreInteractions(cyclosService);
+        verify(paymentService).creditAccount(processResult, 2);
     }
 
     @Test

@@ -54,21 +54,15 @@ public class PaymentService {
             return processResult;
         }
         Notification notification = validPayment.get(true);
-        // register payment in database (convert cent to euro)
-        Payment payment = new Payment(notification.getId(), notification.getDate(), (float) notification.getAmount() / 100,
-                notification.getFirstName(), notification.getName(), notification.getEmail());
-        paymentRepository.save(payment);
-
-
-        // do some manual tests before uncomment this code
-/*        processResult = cyclosService.creditAccount(processResult, helloAssoPayment.getId());
-
-        payment.setStatus(statusPaymentEnum);
-        paymentRepository.save(payment)*/
-        ;
-        // send email if result wrong
-        //sendErrorEmail(processResult, helloAssoPayment.getId());
-
+        final Payment paymentInDatabase = paymentRepository.findById(notification.getId());
+        if (paymentInDatabase == null) {
+            // register payment in database (convert cent to euro)
+            Payment payment = new Payment(notification.getId(), notification.getDate(), (float) notification.getAmount() / 100,
+                    notification.getFirstName(), notification.getName(), notification.getEmail());
+            paymentRepository.save(payment);
+        } else {
+            LOGGER.debug("Payment already inserted in database : {}", notification.getId());
+        }
         return processResult;
     }
 

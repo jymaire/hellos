@@ -23,7 +23,7 @@ public class PaymentInputController {
 
     @PostMapping("/helloasso/payment")
     public void receivePayment(@RequestBody String payment) throws IOException {
-        // INFO level the time to set the system up
+        // INFO level the time to set the systm up
         LOGGER.info("Received payment : {}", payment);
         ProcessResult processResult = new ProcessResult();
         paymentService.handleNewPayment(processResult, payment);

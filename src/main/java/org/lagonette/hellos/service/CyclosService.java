@@ -43,6 +43,7 @@ public class CyclosService {
             LOGGER.error("Payment already proceeded");
             processResult.getErrors().add("Paiement déjà effectué dans Cyclos");
             processResult.setStatusPayment(StatusPaymentEnum.success);
+            return processResult;
         }
         String cyclosUrl = dotenv.get("CYCLOS_URL");
         WebClient webClient = WebClient.builder()

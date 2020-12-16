@@ -1,6 +1,7 @@
 package org.lagonette.hellos.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.cdimascio.dotenv.Dotenv;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.lagonette.hellos.bean.Notification;
@@ -22,6 +23,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -37,6 +39,12 @@ class PaymentServiceTest {
 
     @Mock
     private CyclosService cyclosService;
+
+    @Mock
+    private Dotenv dotenv;
+
+    @Mock
+    private MailService mailService;
 
     @InjectMocks
     private PaymentService paymentService;
@@ -73,7 +81,7 @@ class PaymentServiceTest {
                 .build();
         result.put(true, notification);
         when(helloAssoService.isValidPayment(helloAssoPaymentNotification)).thenReturn(result);
-        //  when(cyclosService.creditAccount(processResult, "id1")).thenReturn(processResult);
+        when(paymentRepository.findById(1)).thenReturn(null);
 
         // WHEN
         paymentService.handleNewPayment(processResult, mapper.writeValueAsString(helloAssoPaymentNotification));
@@ -81,11 +89,9 @@ class PaymentServiceTest {
         // THEN
         ArgumentCaptor<Payment> paymentArgumentCaptor = ArgumentCaptor.forClass(Payment.class);
         verify(paymentRepository, times(1)).save(paymentArgumentCaptor.capture());
-//        verify(paymentRepository, times(2)).save(paymentArgumentCaptor.capture());
         assertThat(paymentArgumentCaptor.getValue())
                 .extracting(Payment::getId, Payment::getDate, Payment::getAmount, Payment::getPayerFirstName, Payment::getPayerLastName)
                 .containsExactly(1, "2018-01-01T00:00:00", 2.4f, "prenom", "nom");
-        //    verify(cyclosService).creditAccount(processResult, "id1");
     }
 
     @Test
@@ -112,5 +118,82 @@ class PaymentServiceTest {
 
         // THEN
         verifyNoInteractions(paymentRepository);
+    }
+
+    @Test
+    void shouldNotSaveSecondPayment() throws IOException {
+        // GIVEN
+        ProcessResult processResult = new ProcessResult(StatusPaymentEnum.success, new HashSet<>());
+        HelloAssoPayer helloAssoPayer = new HelloAssoPayer();
+        helloAssoPayer.setEmail("email@here");
+        HelloAssoPaymentNotificationBody helloAssoPayment = new HelloAssoPaymentNotificationBody();
+        helloAssoPayment.setId(1);
+        helloAssoPayment.setAmount(new HelloAssoAmount(240));
+        helloAssoPayment.setDate("2018-01-01T00:00:00");
+        helloAssoPayer.setFirstName("prenom");
+        helloAssoPayer.setLastName("nom");
+        helloAssoPayment.setPayer(helloAssoPayer);
+        HelloAssoOrder order = new HelloAssoOrder();
+        order.setFormSlug("formSlug");
+        helloAssoPayment.setOrder(order);
+        HelloAssoPaymentNotification helloAssoPaymentNotification = new HelloAssoPaymentNotification("Payment", mapper.writeValueAsString(helloAssoPayment));
+
+        Map<Boolean, Notification> result = new HashMap<>();
+        Notification notification = Notification.NotificationBuilder.aNotification()
+                .withAmount(helloAssoPayment.getAmount().getTotal())
+                .withDate(helloAssoPayment.getDate())
+                .withEmail(helloAssoPayment.getPayer().getEmail())
+                .withFirstName(helloAssoPayment.getPayer().getFirstName())
+                .withName(helloAssoPayment.getPayer().getLastName())
+                .withFormSlug(helloAssoPayment.getOrder().getFormSlug())
+                .withId(helloAssoPayment.getId())
+                .build();
+        result.put(true, notification);
+        when(helloAssoService.isValidPayment(helloAssoPaymentNotification)).thenReturn(result);
+        when(paymentRepository.findById(1)).thenReturn(new Payment());
+
+        // WHEN
+        paymentService.handleNewPayment(processResult, mapper.writeValueAsString(helloAssoPaymentNotification));
+
+        // THEN
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
+    void credit_ok() {
+        // GIVEN
+        ProcessResult processResult = new ProcessResult();
+        ProcessResult processSuccess = new ProcessResult();
+        processSuccess.setStatusPayment(StatusPaymentEnum.success);
+        Payment payment = new Payment();
+        when(paymentRepository.findById(2)).thenReturn(payment);
+        when(cyclosService.creditAccount(processResult, 2)).thenReturn(processSuccess);
+
+        // WHEN
+        paymentService.creditAccount(processResult, 2);
+
+        // THEN
+        verify(cyclosService, times(1)).creditAccount(processResult, 2);
+        verifyNoInteractions(mailService);
+    }
+
+    @Test
+    void credit_ko() {
+        // GIVEN
+        ProcessResult processResult = new ProcessResult();
+        ProcessResult processFail = new ProcessResult();
+        processFail.setStatusPayment(StatusPaymentEnum.fail);
+        processFail.setErrors(Set.of("cyclos error", "an error occured"));
+        Payment payment = new Payment();
+        when(paymentRepository.findById(2)).thenReturn(payment);
+        when(cyclosService.creditAccount(processResult, 2)).thenReturn(processFail);
+        when(dotenv.get("MAIL_RECIPIENT")).thenReturn("mail@mail.com");
+
+        // WHEN
+        paymentService.creditAccount(processResult, 2);
+
+        // THEN
+        verify(cyclosService, times(1)).creditAccount(processResult, 2);
+        verify(mailService).sendEmail(eq("mail@mail.com"), eq("[Hellos] Erreur lors du traitement"), anyString());
     }
 }

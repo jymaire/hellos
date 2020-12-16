@@ -1,5 +1,7 @@
 package org.lagonette.hellos.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.mail.MailException;
 import org.springframework.mail.MailSender;
 import org.springframework.mail.SimpleMailMessage;
@@ -7,6 +9,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class MailService {
+    private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
+
     private final MailSender mailSender;
     private final SimpleMailMessage templateMessage;
 
@@ -24,9 +28,7 @@ public class MailService {
         try {
             this.mailSender.send(msg);
         } catch (MailException ex) {
-            // simply log it and go on...
-            //TODO log error
-            System.err.println(ex.getMessage());
+            LOGGER.error("Error during email sending : {}", ex.getMessage());
         }
     }
 }

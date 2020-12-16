@@ -6,6 +6,7 @@ import io.github.cdimascio.dotenv.Dotenv;
 import org.lagonette.hellos.bean.Notification;
 import org.lagonette.hellos.bean.StatusPaymentEnum;
 import org.lagonette.hellos.bean.helloasso.HelloAssoOrder;
+import org.lagonette.hellos.bean.helloasso.HelloAssoPaymentStateEnum;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotification;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotificationBody;
 import org.lagonette.hellos.entity.Payment;
@@ -63,22 +64,10 @@ public class HelloAssoService {
                         .withId(helloAssoPayment.getId())
                         .build();
             } else if (helloAssoPaymentNotification.getEventType().equals("Order")) {
-                byte[] json = objectMapper.writeValueAsBytes(helloAssoPaymentNotification.getData());
-                order = objectMapper.readValue(json, HelloAssoOrder.class);
-                if (validateOrderNotification(helloAssoPaymentNotification, order)) {
-                    end.put(false, null);
-                    return end;
-                }
-
-                notification = Notification.NotificationBuilder.aNotification()
-                        .withAmount(order.getAmount().getTotal())
-                        .withId(order.getId())
-                        .withFormSlug(order.getFormSlug())
-                        .withName(order.getPayer().getLastName())
-                        .withFirstName(order.getPayer().getFirstName())
-                        .withEmail(order.getPayer().getEmail())
-                        .withDate(order.getDate())
-                        .build();
+                // both a payment and an order notifications are sent, only process one
+                LOGGER.debug("do not prcess order, in order to avoid double credit");
+                end.put(false, null);
+                return end;
             } else {
                 LOGGER.error("Error during event type choice : {}", helloAssoPaymentNotification);
                 end.put(false, null);
@@ -123,7 +112,7 @@ public class HelloAssoService {
                 LOGGER.warn("Payment too important : {}", helloAssoPayment.getAmount());
                 mailService.sendEmail(dotenv.get("MAIL_RECIPIENT"), "[Hellos] Paiement dépassant la limite",
                         "Un paiement a dépassé la limite autorisée, approbation manuelle requise : \n" + helloAssoPaymentNotification.getData().toString());
-                payment = new Payment(helloAssoPayment.getId(), helloAssoPayment.getDate(), total, helloAssoPayment.getPayer().getFirstName(), helloAssoPayment.getPayer().getLastName(), helloAssoPayment.getPayer().getEmail());
+                payment = new Payment(helloAssoPayment.getId(), helloAssoPayment.getDate(), total / 100, helloAssoPayment.getPayer().getFirstName(), helloAssoPayment.getPayer().getLastName(), helloAssoPayment.getPayer().getEmail());
                 payment.setStatus(StatusPaymentEnum.tooHigh);
                 paymentRepository.save(payment);
             }
@@ -137,6 +126,10 @@ public class HelloAssoService {
 
         if (helloAssoPayment.getOrder() == null) {
             LOGGER.error("Order was not set {}", helloAssoPaymentNotification);
+            return true;
+        }
+        if (!HelloAssoPaymentStateEnum.Authorized.name().equals(helloAssoPayment.getState())) {
+            LOGGER.error("Wrong state {}", helloAssoPayment);
             return true;
         }
         return false;

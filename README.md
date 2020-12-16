@@ -10,7 +10,7 @@ The business context is local currencies.
 
 ## Packaging guide
 
-To deploy this app, you need to run the Maven package command `mvn -DskipTests=true package` in the directory where is the pom.xml file (root directory of the project).
+To deploy this app, you need to run the Maven package command `mvn -DskipTests=true package` in the directory where the pom.xml file is (root directory of the project).
 Then, you have a jar file named `hellos-0.0.1-SNAPSHOT.jar` (version may change) in the `target` directory.
 This jar is an executable file, so you can execute it. To register it as service, you follow the Spring Boot documentation https://docs.spring.io/spring-boot/docs/current/reference/html/deployment.html#deployment-install
 
