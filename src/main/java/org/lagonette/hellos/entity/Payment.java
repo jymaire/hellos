@@ -2,6 +2,7 @@ package org.lagonette.hellos.entity;
 
 import org.lagonette.hellos.bean.StatusPaymentEnum;
 
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import java.time.LocalDateTime;
@@ -10,7 +11,7 @@ import static org.lagonette.hellos.bean.StatusPaymentEnum.todo;
 
 @Entity
 public class Payment {
-
+    public static final int ERROR_LENGTH = 700;
     @Id
     private int id;
     private String date;
@@ -21,6 +22,7 @@ public class Payment {
     // technical field, to handle purge process
     private LocalDateTime insertionDate;
     private StatusPaymentEnum status;
+    @Column(length = ERROR_LENGTH)
     private String error;
     private String email;
 

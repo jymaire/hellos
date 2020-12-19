@@ -63,6 +63,10 @@ public class CyclosService {
         if (!getUserResponse.getStatusCode().is2xxSuccessful() || getUserResponse.getBody().size() != 1 || getUserResponse.getBody().get(0).getGroup() == null) {
             processResult.setStatusPayment(StatusPaymentEnum.fail);
             processResult.getErrors().add("Erreur pendant la récupération de l'utilisateur dans Cyclos, détails de la réponse : {} " + getUserResponse);
+            LOGGER.info("Status code is successful : {}", getUserResponse.getStatusCode().is2xxSuccessful());
+            LOGGER.info("Body size : {}", getUserResponse.getBody().size());
+            LOGGER.debug("Body content : {}", getUserResponse.getBody());
+            LOGGER.info("User group : {}", getUserResponse.getBody().get(0).getGroup());
             return processResult;
         }
         CyclosUser cyclosUser = getUserResponse.getBody().get(0);
