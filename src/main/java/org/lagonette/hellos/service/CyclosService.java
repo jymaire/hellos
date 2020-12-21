@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunctions;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -60,13 +61,24 @@ public class CyclosService {
                 .block();
 
         // TODO create a testable method to validate API return
-        if (!getUserResponse.getStatusCode().is2xxSuccessful() || getUserResponse.getBody().size() != 1 || getUserResponse.getBody().get(0).getGroup() == null) {
+        if (getUserResponse == null || getUserResponse.getBody() == null || !getUserResponse.getStatusCode().is2xxSuccessful() || getUserResponse.getBody().size() != 1 || getUserResponse.getBody().get(0).getGroup() == null) {
             processResult.setStatusPayment(StatusPaymentEnum.fail);
             processResult.getErrors().add("Erreur pendant la récupération de l'utilisateur dans Cyclos, détails de la réponse : {} " + getUserResponse);
+            if (getUserResponse == null){
+                processResult.setStatusPayment(StatusPaymentEnum.fail);
+                return processResult;
+            }
             LOGGER.info("Status code is successful : {}", getUserResponse.getStatusCode().is2xxSuccessful());
-            LOGGER.info("Body size : {}", getUserResponse.getBody().size());
+            if (getUserResponse.getBody() != null) {
+                LOGGER.info("Body size : {}", getUserResponse.getBody().size());
+            }
             LOGGER.debug("Body content : {}", getUserResponse.getBody());
-            LOGGER.info("User group : {}", getUserResponse.getBody().get(0).getGroup());
+            if (!CollectionUtils.isEmpty(getUserResponse.getBody())) {
+                LOGGER.info("User group : {}", getUserResponse.getBody().get(0).getGroup());
+            } else {
+                LOGGER.info("Body empty, can't debug group");
+            }
+            processResult.setStatusPayment(StatusPaymentEnum.fail);
             return processResult;
         }
         CyclosUser cyclosUser = getUserResponse.getBody().get(0);
@@ -97,7 +109,8 @@ public class CyclosService {
                 .toEntityList(CyclosPerformPaymentResponse.class)
                 .block();
         LOGGER.debug("response : {}", paymentResponse);
-        if (!paymentResponse.getStatusCode().is2xxSuccessful()) {
+        if (paymentResponse == null || !paymentResponse.getStatusCode().is2xxSuccessful()) {
+            processResult.getErrors().add("Erreur technique lors du paiement dans Cyclos");
             processResult.setStatusPayment(StatusPaymentEnum.fail);
             return processResult;
         }
@@ -114,7 +127,7 @@ public class CyclosService {
                 .toEntityList(CyclosTransaction.class)
                 .block();
 
-        if (getLastTransaction.getBody().isEmpty()) {
+        if (getLastTransaction.getBody() == null || getLastTransaction.getBody().isEmpty()) {
             return false;
         }
         LOGGER.debug("Last description : {}", getLastTransaction.getBody());
