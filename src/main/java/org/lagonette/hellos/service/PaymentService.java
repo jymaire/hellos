@@ -75,8 +75,11 @@ public class PaymentService {
 
         processResult = cyclosService.creditAccount(processResult, paymentId);
         payment.setStatus(processResult.getStatusPayment());
-        if (processResult.getErrors().toString().length() > Payment.ERROR_LENGTH) {
+        if (!processResult.getErrors().isEmpty() && processResult.getErrors().toString().length() > Payment.ERROR_LENGTH) {
             payment.setError(processResult.getErrors().toString().substring(0, Payment.ERROR_LENGTH - 100));
+        }
+        else {
+            payment.setError(processResult.getErrors().toString());
         }
         paymentRepository.save(payment);
         sendErrorEmail(processResult, paymentId);
