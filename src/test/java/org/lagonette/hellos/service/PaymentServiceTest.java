@@ -196,4 +196,33 @@ class PaymentServiceTest {
         verify(cyclosService, times(1)).creditAccount(processResult, 2);
         verify(mailService).sendEmail(eq("mail@mail.com"), eq("[Hellos] Erreur lors du traitement"), anyString());
     }
+
+    @Test
+    void error_message_too_long() {
+        // GIVEN
+        ProcessResult processResult = new ProcessResult();
+        ProcessResult processFail = new ProcessResult();
+        processFail.setStatusPayment(StatusPaymentEnum.fail);
+        processFail.setErrors(Set.of("cyclos error", "an error occuredaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+        Payment payment = Payment.PaymentBuilder.aPayment().withId(2).build();
+        when(paymentRepository.findById(2)).thenReturn(payment);
+        when(cyclosService.creditAccount(processResult, 2)).thenReturn(processFail);
+        when(dotenv.get("MAIL_RECIPIENT")).thenReturn("mail@mail.com");
+
+        // WHEN
+        paymentService.creditAccount(processResult, 2);
+
+        // THEN
+        assertThat(processFail.getErrors().toString().length()).isGreaterThan(Payment.ERROR_LENGTH);
+        ArgumentCaptor<Payment> argumentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(argumentCaptor.capture());
+        assertThat(argumentCaptor.getValue().getError().length()).isLessThan(Payment.ERROR_LENGTH);
+        verify(cyclosService, times(1)).creditAccount(processResult, 2);
+        verify(mailService).sendEmail(eq("mail@mail.com"), eq("[Hellos] Erreur lors du traitement"), anyString());
+    }
 }

@@ -10,7 +10,7 @@
     </parent>
     <groupId>org.lagonette</groupId>
     <artifactId>hellos</artifactId>
-    <version>0.0.2</version>
+    <version>0.0.3</version>
     <name>hellos</name>
     <description>Forward event from Hello Asso API to Cyclos</description>
 

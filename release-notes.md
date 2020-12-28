@@ -1,5 +1,8 @@
 # Releases notes
 
+## 0.0.3
+* fix bug when error mesage is too long
+
 ## 0.0.2
 * fix bug when amount was too high (payment was saved in cents instead of unit)
 * prevent one payment to be executed twice
