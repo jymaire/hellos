@@ -11,7 +11,7 @@ Pour cela, il faut aller dans "Mon Compte"/"Intégrations et API". Là vous pouv
 L'URL de callback est également paramétrable dans cette page. Il s'agit de l'URL de votre serveur, plus `helloasso/payment` (défini dans la classe `PaymentInputController`).
 
 Une fois ces informations récupérées, vous devez les rajouter dans votre fichier `.env`.
-Les propriétés  associées sont `HELLO_ASSO_CLIENT_ID` et `HELLO_ASSO_CLIENT_SECRET`.
+Les propriétés associées sont `HELLO_ASSO_CLIENT_ID` et `HELLO_ASSO_CLIENT_SECRET`.
 
 Il faut également définir les autres propriétés préfixées par `HELLO_ASSO` présentes dans le fichier `.env.dist`.
 

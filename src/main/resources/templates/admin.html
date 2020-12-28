@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <title>Page admin</title>
+    <link rel="stylesheet" th:href="@{/style/admin.css}"/>
+    <link rel="shortcut icon" th:href="@{/images/favicon.ico}" type="image/x-icon"/>
+    <meta content="width=device-width, initial-scale=1" name="viewport"/>
+</head>
+<body>
+<h1>Page d'admin</h1>
+<i>Un grand pouvoir engendre de grandes responsabilités.</i>
+<div class="align-div">
+    <div>
+        <div class="right admin" id="admin">
+            <button onclick="window.location.href='list';">Retour liste paiements</button>
+        </div>
+        <div class="right logout" id="out">
+            <form method="POST" th:action="@{/logout}">
+                <input type="submit" value="Se déconnecter"/>
+            </form>
+        </div>
+        <br>
+        <br>
+    </div>
+</div>
+<div class="config">
+    <form method="post" th:action="@{/admin}" th:object="${adminConfig}">
+        <div class="un"><label> Activer paiements vers Cyclos :</label> <input name="enable-cyclos"
+                                                                               th:field="*{paymentCyclosEnabled}"
+                                                                               type="checkbox"/>
+        </div>
+        <div class="un"><label> Activer paiements automatiques : <input name="enable-automatic"
+                                                                        th:field="*{paymentAutomaticEnabled}"
+                                                                        type="checkbox"/>
+        </label></div>
+        <div class="un"><label> Email recevant les notifications : <input name="email"
+                                                                          th:field="*{mailRecipient}"
+                                                                          type="text"/>
+        </label>
+            <p>Pour ajouter plusieurs destinataires, séparer les emails par des virgules (sans espace)</p>
+        </div>
+        <div><input class="submit" type="submit" value="Valider configuration"/></div>
+    </form>
+</div>
+</body>
+</html>

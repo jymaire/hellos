@@ -12,7 +12,9 @@ import org.lagonette.hellos.bean.helloasso.HelloAssoPayer;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoAmount;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotification;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotificationBody;
+import org.lagonette.hellos.entity.Configuration;
 import org.lagonette.hellos.entity.Payment;
+import org.lagonette.hellos.repository.ConfigurationRepository;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -20,16 +22,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.lagonette.hellos.service.ConfigurationService.MAIL_RECIPIENT;
+import static org.lagonette.hellos.service.ConfigurationService.PAYMENT_AUTOMATIC_ENABLED;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceTest {
+
+    @Mock
+    private ConfigurationRepository configurationRepository;
 
     @Mock
     private PaymentRepository paymentRepository;
@@ -49,7 +53,7 @@ class PaymentServiceTest {
     @InjectMocks
     private PaymentService paymentService;
 
-    private ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
     void handleNewPayment_success() throws IOException {
@@ -82,6 +86,7 @@ class PaymentServiceTest {
         result.put(true, notification);
         when(helloAssoService.isValidPayment(helloAssoPaymentNotification)).thenReturn(result);
         when(paymentRepository.findById(1)).thenReturn(null);
+        when(configurationRepository.findById(PAYMENT_AUTOMATIC_ENABLED)).thenReturn(Optional.of(new Configuration(PAYMENT_AUTOMATIC_ENABLED, "false")));
 
         // WHEN
         paymentService.handleNewPayment(processResult, mapper.writeValueAsString(helloAssoPaymentNotification));
@@ -165,7 +170,7 @@ class PaymentServiceTest {
         ProcessResult processResult = new ProcessResult();
         ProcessResult processSuccess = new ProcessResult();
         processSuccess.setStatusPayment(StatusPaymentEnum.success);
-        Payment payment = new Payment();
+        Payment payment = Payment.PaymentBuilder.aPayment().withId(2).build();
         when(paymentRepository.findById(2)).thenReturn(payment);
         when(cyclosService.creditAccount(processResult, 2)).thenReturn(processSuccess);
 
@@ -184,10 +189,10 @@ class PaymentServiceTest {
         ProcessResult processFail = new ProcessResult();
         processFail.setStatusPayment(StatusPaymentEnum.fail);
         processFail.setErrors(Set.of("cyclos error", "an error occured"));
-        Payment payment = new Payment();
+        Payment payment = Payment.PaymentBuilder.aPayment().withId(2).build();
         when(paymentRepository.findById(2)).thenReturn(payment);
         when(cyclosService.creditAccount(processResult, 2)).thenReturn(processFail);
-        when(dotenv.get("MAIL_RECIPIENT")).thenReturn("mail@mail.com");
+        when(configurationRepository.findById(MAIL_RECIPIENT)).thenReturn(Optional.of(new Configuration(MAIL_RECIPIENT, "mail@mail.com")));
 
         // WHEN
         paymentService.creditAccount(processResult, 2);
@@ -212,7 +217,7 @@ class PaymentServiceTest {
         Payment payment = Payment.PaymentBuilder.aPayment().withId(2).build();
         when(paymentRepository.findById(2)).thenReturn(payment);
         when(cyclosService.creditAccount(processResult, 2)).thenReturn(processFail);
-        when(dotenv.get("MAIL_RECIPIENT")).thenReturn("mail@mail.com");
+        when(configurationRepository.findById(MAIL_RECIPIENT)).thenReturn(Optional.of(new Configuration(MAIL_RECIPIENT, "mail@mail.com")));
 
         // WHEN
         paymentService.creditAccount(processResult, 2);
@@ -225,4 +230,5 @@ class PaymentServiceTest {
         verify(cyclosService, times(1)).creditAccount(processResult, 2);
         verify(mailService).sendEmail(eq("mail@mail.com"), eq("[Hellos] Erreur lors du traitement"), anyString());
     }
+
 }

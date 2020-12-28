@@ -17,6 +17,6 @@ List of features to implement (without external dependencies)
 * add doc in French (hello asso api key generation, Cyclos user configuration, .env file to create)
 * add full demo mode to be able to run the application without production credentials
 * add credit for freepik
-* add limit amount (250€) per payment with mail notif -> test todo
+* add limit amount (250 €) per payment with mail notif -> test todo
 * add check from cyclos to prevent double payment
 * remove token from DB and store it in a static map

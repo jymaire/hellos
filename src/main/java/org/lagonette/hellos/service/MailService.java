@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class MailService {
+    public static final String MAIL_DELIMITER = ",";
     private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 
     private final MailSender mailSender;
@@ -22,7 +23,8 @@ public class MailService {
     public void sendEmail(String emailRecipient, String subject, String body) {
         // Create a thread safe "copy" of the template message and customize it
         SimpleMailMessage msg = new SimpleMailMessage(this.templateMessage);
-        msg.setTo(emailRecipient);
+        final String[] emails = emailRecipient.split(MAIL_DELIMITER);
+        msg.setTo(emails);
         msg.setSubject(subject);
         msg.setText(body);
         try {

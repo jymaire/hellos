@@ -5,19 +5,24 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.lagonette.hellos.bean.Notification;
 import org.lagonette.hellos.bean.StatusPaymentEnum;
-import org.lagonette.hellos.bean.helloasso.HelloAssoOrder;
 import org.lagonette.hellos.bean.helloasso.HelloAssoPaymentStateEnum;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotification;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotificationBody;
 import org.lagonette.hellos.entity.Payment;
+import org.lagonette.hellos.repository.ConfigurationRepository;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
+
+import static org.lagonette.hellos.service.ConfigurationService.MAIL_RECIPIENT;
 
 @Service
 public class HelloAssoService {
@@ -27,11 +32,13 @@ public class HelloAssoService {
     private final MailService mailService;
     private final Dotenv dotenv;
     private final PaymentRepository paymentRepository;
+    private final ConfigurationRepository configurationRepository;
 
-    public HelloAssoService(Dotenv dotenv, MailService mailService, PaymentRepository paymentRepository) {
+    public HelloAssoService(Dotenv dotenv, MailService mailService, PaymentRepository paymentRepository, ConfigurationRepository configurationRepository) {
         this.dotenv = dotenv;
         this.mailService = mailService;
         this.paymentRepository = paymentRepository;
+        this.configurationRepository = configurationRepository;
     }
 
     public Map<Boolean, Notification> isValidPayment(HelloAssoPaymentNotification helloAssoPaymentNotification) throws IOException {
@@ -43,7 +50,6 @@ public class HelloAssoService {
         }
         ObjectMapper objectMapper = new ObjectMapper();
         HelloAssoPaymentNotificationBody helloAssoPayment;
-        HelloAssoOrder order;
         Notification notification;
         try {
             if (helloAssoPaymentNotification.getEventType().equals("Payment")) {
@@ -84,22 +90,20 @@ public class HelloAssoService {
             end.put(false, null);
             return end;
         }
+        if (StringUtils.isEmpty(notification.getDate())) {
+            LOGGER.error("Date not set : {}", helloAssoPaymentNotification);
+            end.put(false, null);
+            return end;
+        }
+
+        // convert date to an easier format to read for human
+        final LocalDateTime dateTime = LocalDateTime.parse(notification.getDate(), DateTimeFormatter.ISO_DATE_TIME);
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss");
+        String dateWithEasyToReadFormat = dateTime.format(dateTimeFormatter);
+        notification.setDate(dateWithEasyToReadFormat);
+
         end.put(true, notification);
         return end;
-    }
-
-    private boolean validateOrderNotification(HelloAssoPaymentNotification helloAssoPaymentNotification, HelloAssoOrder order) {
-        if (order.getAmount() == null || order.getAmount().getTotal() > (Integer.parseInt(dotenv.get("HELLO_ASSO_MAX_AMOUNT")) * 100)) {
-            LOGGER.warn("Payment too important : {}", order.getAmount());
-            mailService.sendEmail(dotenv.get("MAIL_RECIPIENT"), "[Hellos] Paiement dépassant la limite",
-                    "Un paiement a dépassé la limite autorisée, approbation manuelle requise : \n" + helloAssoPaymentNotification.getData().toString());
-            return true;
-        }
-        if (order.getPayer() == null) {
-            LOGGER.error("Payer was not set {}", helloAssoPaymentNotification);
-            return true;
-        }
-        return false;
     }
 
     private boolean validatePaymentNotification(HelloAssoPaymentNotification helloAssoPaymentNotification, HelloAssoPaymentNotificationBody helloAssoPayment) {
@@ -110,9 +114,9 @@ public class HelloAssoService {
             Payment payment = paymentRepository.findById(helloAssoPayment.getId());
             if (payment == null) {
                 LOGGER.warn("Payment too important : {}", helloAssoPayment.getAmount());
-                mailService.sendEmail(dotenv.get("MAIL_RECIPIENT"), "[Hellos] Paiement dépassant la limite",
+                mailService.sendEmail(configurationRepository.findById(MAIL_RECIPIENT).get().getValue(), "[Hellos] Paiement dépassant la limite",
                         "Un paiement a dépassé la limite autorisée, approbation manuelle requise : \n" + helloAssoPaymentNotification.getData().toString());
-                payment = new Payment(helloAssoPayment.getId(), helloAssoPayment.getDate(), total / 100, helloAssoPayment.getPayer().getFirstName(), helloAssoPayment.getPayer().getLastName(), helloAssoPayment.getPayer().getEmail());
+                payment = new Payment(helloAssoPayment.getId(), helloAssoPayment.getDate(), total / 100f, helloAssoPayment.getPayer().getFirstName(), helloAssoPayment.getPayer().getLastName(), helloAssoPayment.getPayer().getEmail());
                 payment.setStatus(StatusPaymentEnum.tooHigh);
                 paymentRepository.save(payment);
             }

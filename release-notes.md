@@ -1,7 +1,13 @@
 # Releases notes
 
+## 0.0.4
+* add administration panel to (des)activate automatic payments and payments into cyclos
+* add possibility to change email recipient also through panel admin
+* fix lot of small typo and bug possible situation (static code analysis)
+* add more details on error page
+
 ## 0.0.3
-* fix bug when error mesage is too long
+* fix bug when error message is too long
 
 ## 0.0.2
 * fix bug when amount was too high (payment was saved in cents instead of unit)
