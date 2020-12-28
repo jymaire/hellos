@@ -22,9 +22,9 @@ public class DemoConfig {
     public CommandLineRunner demo(PaymentRepository repository) {
         return (args) -> {
             // save a few payments
-            Payment payment = new Payment(11, "2020-apo", 2.4f, "first", "last", "mail@mail.fr");
+            Payment payment = new Payment(11, "2020-apo", 2.4f, "first", "last", "test@test.fr");
             payment.setInsertionDate(LocalDateTime.parse("2019-02-01T11:11:11"));
-            payment.setError("a bug occured");
+            payment.setError("a bug occurred");
             repository.save(payment);
             repository.save(new Payment(22, "2020-apo", 2.4f, "first", "last", "email2"));
             List<Payment> all = repository.findAll();

@@ -18,5 +18,5 @@ public enum PaymentStateEnum {
     Canceled,
     Contested,
     WaitingBankValidation,
-    WaitingBankWithdraw;
+    WaitingBankWithdraw
 }

@@ -1,5 +1,6 @@
 package org.lagonette.hellos.repository;
 
+import com.sun.istack.NotNull;
 import org.lagonette.hellos.entity.Payment;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -15,12 +16,12 @@ public interface PaymentRepository extends CrudRepository<Payment, Long> {
 
     Payment findById(int id);
 
-    Payment save(Payment payment);
+    Payment save(@NotNull Payment payment);
 
     @Query("SELECT id " +
             "FROM Payment p " +
             "WHERE p.insertionDate < ?1")
-    List<Integer> findIdsByInsertionDateBefore(LocalDateTime date);
+    List<Integer> findIdsByInsertionDateBefore(@NotNull LocalDateTime date);
 
     @Modifying
     @Query("DELETE FROM Payment p WHERE p.id IN ?1")

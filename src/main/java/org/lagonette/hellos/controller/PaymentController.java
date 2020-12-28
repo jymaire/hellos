@@ -3,11 +3,7 @@ package org.lagonette.hellos.controller;
 import org.lagonette.hellos.bean.ProcessResult;
 import org.lagonette.hellos.entity.Payment;
 import org.lagonette.hellos.repository.PaymentRepository;
-import org.lagonette.hellos.service.CyclosService;
-import org.lagonette.hellos.service.HelloAssoService;
 import org.lagonette.hellos.service.PaymentService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
@@ -19,17 +15,11 @@ import java.util.List;
 
 @Controller
 public class PaymentController {
-    private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
-
     private final PaymentRepository paymentRepository;
-    private final CyclosService cyclosService;
-    private final HelloAssoService helloAssoService;
     private final PaymentService paymentService;
 
-    public PaymentController(PaymentRepository paymentRepository, CyclosService cyclosService, HelloAssoService helloAssoService, PaymentService paymentService) {
+    public PaymentController(PaymentRepository paymentRepository, PaymentService paymentService) {
         this.paymentRepository = paymentRepository;
-        this.cyclosService = cyclosService;
-        this.helloAssoService = helloAssoService;
         this.paymentService = paymentService;
     }
 

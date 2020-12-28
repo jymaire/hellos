@@ -7,10 +7,12 @@
     <meta content="width=device-width, initial-scale=1" name="viewport"/>
 </head>
 <body>
-<div class="main">
     <h1>Liste des paiements reçus via Hello Asso</h1>
     <div class="align-div">
         <div>
+            <div class="right admin" id="admin">
+                <button onclick="window.location.href='admin';">Panneau admin</button>
+            </div>
             <div class="right logout" id="out">
                 <form method="POST" th:action="@{/logout}">
                     <input type="submit" value="Se déconnecter"/>

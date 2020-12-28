@@ -1,7 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:th="http://www.thymeleaf.org">
 <body>
 <h1>Oups, une erreur est survenue</h1>
+<p><span th:text="${status}"/> <span th:text="${error}"/> : <span th:text="${message}"/></p>
+<br>
+<br>
 <a href="/">Retour à la page d'accueil</a>
 </body>
 </html>

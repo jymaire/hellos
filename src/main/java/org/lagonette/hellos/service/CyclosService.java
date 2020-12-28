@@ -7,11 +7,12 @@ import org.lagonette.hellos.bean.cyclos.CyclosPerformPayment;
 import org.lagonette.hellos.bean.cyclos.CyclosPerformPaymentResponse;
 import org.lagonette.hellos.bean.cyclos.CyclosTransaction;
 import org.lagonette.hellos.bean.cyclos.CyclosUser;
+import org.lagonette.hellos.entity.Configuration;
 import org.lagonette.hellos.entity.Payment;
+import org.lagonette.hellos.repository.ConfigurationRepository;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -22,16 +23,20 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
 
+import static org.lagonette.hellos.service.ConfigurationService.PAYMENT_CYCLOS_ENABLED;
+
 @Component
 public class CyclosService {
     public static final String DESCRIPTION = "Paiement automatique, id technique ";
     private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 
+    private final ConfigurationRepository configurationRepository;
     private final PaymentRepository paymentRepository;
     private final MailService mailService;
     private final Dotenv dotenv;
 
-    public CyclosService(PaymentRepository paymentRepository, MailService mailService, Dotenv dotenv) {
+    public CyclosService(ConfigurationRepository configurationRepository, PaymentRepository paymentRepository, MailService mailService, Dotenv dotenv) {
+        this.configurationRepository = configurationRepository;
         this.paymentRepository = paymentRepository;
         this.mailService = mailService;
         this.dotenv = dotenv;
@@ -64,7 +69,7 @@ public class CyclosService {
         if (getUserResponse == null || getUserResponse.getBody() == null || !getUserResponse.getStatusCode().is2xxSuccessful() || getUserResponse.getBody().size() != 1 || getUserResponse.getBody().get(0).getGroup() == null) {
             processResult.setStatusPayment(StatusPaymentEnum.fail);
             processResult.getErrors().add("Erreur pendant la récupération de l'utilisateur dans Cyclos, détails de la réponse : {} " + getUserResponse);
-            if (getUserResponse == null){
+            if (getUserResponse == null) {
                 processResult.setStatusPayment(StatusPaymentEnum.fail);
                 return processResult;
             }
@@ -99,10 +104,15 @@ public class CyclosService {
             processResult.getErrors().add("Paiement déjà réalisé dans Cyclos");
             return processResult;
         }
+        String paymentUrl;
+        if ("true".equals(configurationRepository.findById(PAYMENT_CYCLOS_ENABLED).orElse(new Configuration(PAYMENT_CYCLOS_ENABLED, "false")).getValue())) {
+            paymentUrl = "/system/payments";
+        } else {
+            paymentUrl = "/system/payments/preview";
+        }
 
         ResponseEntity<List<CyclosPerformPaymentResponse>> paymentResponse = webClient.post()
-                // to realize some test, you can use "preview" mode -> .uri("/system/payments/preview")
-                .uri("/system/payments")
+                .uri(paymentUrl)
                 .body(BodyInserters.fromValue(new CyclosPerformPayment(Float.toString(payment.getAmount()), payment.getEmail(), DESCRIPTION + payment.getId(), type)))
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
@@ -114,8 +124,13 @@ public class CyclosService {
             processResult.setStatusPayment(StatusPaymentEnum.fail);
             return processResult;
         }
-        LOGGER.info("Payment successfully ended for payment {}", id);
-        processResult.setStatusPayment(StatusPaymentEnum.success);
+        if ("true".equals(configurationRepository.findById(PAYMENT_CYCLOS_ENABLED).orElse(new Configuration(PAYMENT_CYCLOS_ENABLED, "false")).getValue())) {
+            LOGGER.info("Payment successfully ended for payment {}", id);
+            processResult.setStatusPayment(StatusPaymentEnum.success);
+        } else {
+            LOGGER.info("Preview of payment successfully ended for payment {}", id);
+            processResult.setStatusPayment(StatusPaymentEnum.previewOK);
+        }
         return processResult;
     }
 
@@ -127,7 +142,7 @@ public class CyclosService {
                 .toEntityList(CyclosTransaction.class)
                 .block();
 
-        if (getLastTransaction.getBody() == null || getLastTransaction.getBody().isEmpty()) {
+        if (getLastTransaction == null || getLastTransaction.getBody() == null || getLastTransaction.getBody().isEmpty()) {
             return false;
         }
         LOGGER.debug("Last description : {}", getLastTransaction.getBody());
@@ -135,29 +150,6 @@ public class CyclosService {
         if (!expectedMessage.equals(getLastTransaction.getBody().get(0).getDescription())) {
             return false;
         }
-        return true;
-    }
-
-    private void next(ResponseEntity<List<CyclosUser>> value) {
-
-        if (!HttpStatus.OK.equals(value.getStatusCode())) {
-            LOGGER.error("Error during fetch of users : {}", value.toString());
-            mailService.sendEmail(dotenv.get("MAIL_RECIPIENT"), "Erreur technique", "Erreur technique lors de la récupération des utilisateurs." +
-                    "\n Détail de l'erreur : \n " + value.toString());
-            return;
-        }
-        if (value.getBody().size() != 1) {
-            LOGGER.error("Error during fetch of users, number of found users : {}", value.getBody().size());
-            LOGGER.debug("Response : {}", value);
-            mailService.sendEmail(dotenv.get("MAIL_RECIPIENT"), "Erreur récupération utilisateurs", "Erreur lors de la récupération des utilisateurs." +
-                    "\n Nombre trouvé : " + value.getBody().size() +
-                    "\n Détail de l'erreur : \n " + value.toString());
-            return;
-        }
-        LOGGER.debug("alright, all wrong cases excluded, we can credit account");
-    }
-
-    public boolean isValidUser(String email) {
         return true;
     }
 }
