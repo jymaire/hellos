@@ -5,15 +5,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.lagonette.hellos.bean.Notification;
 import org.lagonette.hellos.bean.StatusPaymentEnum;
+import org.lagonette.hellos.bean.helloasso.HelloAssoItemCustomField;
+import org.lagonette.hellos.bean.helloasso.HelloAssoOrderItem;
 import org.lagonette.hellos.bean.helloasso.HelloAssoPaymentStateEnum;
+import org.lagonette.hellos.bean.helloasso.notification.HelloAssoOrderNotificationBody;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotification;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotificationBody;
+import org.lagonette.hellos.entity.EmailLink;
 import org.lagonette.hellos.entity.Payment;
 import org.lagonette.hellos.repository.ConfigurationRepository;
+import org.lagonette.hellos.repository.EmailLinkRepository;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
@@ -31,12 +37,14 @@ public class HelloAssoService {
 
     private final MailService mailService;
     private final Dotenv dotenv;
+    private final EmailLinkRepository emailLinkRepository;
     private final PaymentRepository paymentRepository;
     private final ConfigurationRepository configurationRepository;
 
-    public HelloAssoService(Dotenv dotenv, MailService mailService, PaymentRepository paymentRepository, ConfigurationRepository configurationRepository) {
+    public HelloAssoService(Dotenv dotenv, MailService mailService, EmailLinkRepository emailLinkRepository, PaymentRepository paymentRepository, ConfigurationRepository configurationRepository) {
         this.dotenv = dotenv;
         this.mailService = mailService;
+        this.emailLinkRepository = emailLinkRepository;
         this.paymentRepository = paymentRepository;
         this.configurationRepository = configurationRepository;
     }
@@ -70,10 +78,7 @@ public class HelloAssoService {
                         .withId(helloAssoPayment.getId())
                         .build();
             } else if (helloAssoPaymentNotification.getEventType().equals("Order")) {
-                // both a payment and an order notifications are sent, only process one
-                LOGGER.debug("do not prcess order, in order to avoid double credit");
-                end.put(false, null);
-                return end;
+                return processOrder(helloAssoPaymentNotification, end, objectMapper);
             } else {
                 LOGGER.error("Error during event type choice : {}", helloAssoPaymentNotification);
                 end.put(false, null);
@@ -103,6 +108,33 @@ public class HelloAssoService {
         notification.setDate(dateWithEasyToReadFormat);
 
         end.put(true, notification);
+        return end;
+    }
+
+    private Map<Boolean, Notification> processOrder(HelloAssoPaymentNotification helloAssoPaymentNotification, Map<Boolean, Notification> end, ObjectMapper objectMapper) throws IOException {
+        // both a payment and an order notifications are sent, only process one
+        LOGGER.debug("do not prcess order, in order to avoid double credit");
+        // but record, if there is one, the email linked to the Cyclos account
+        byte[] json = objectMapper.writeValueAsBytes(helloAssoPaymentNotification.getData());
+        HelloAssoOrderNotificationBody helloAssoOrder = objectMapper.readValue(json, HelloAssoOrderNotificationBody.class);
+        if (helloAssoOrder != null && !CollectionUtils.isEmpty(helloAssoOrder.getItems())) {
+            final String fieldName = dotenv.get("HELLO_ASSO_EXTRA_MAIL_FIELD_NAME");
+            if (fieldName == null) {
+                LOGGER.debug("Value for HELLO_ASSO_EXTRA_MAIL_FIELD_NAME is not set");
+                end.put(false, null);
+                return end;
+            }
+            for (HelloAssoOrderItem item : helloAssoOrder.getItems()) {
+                if (!CollectionUtils.isEmpty(item.getCustomFields())) {
+                    for (HelloAssoItemCustomField field : item.getCustomFields()) {
+                        if (fieldName.equals(field.getName())) {
+                            emailLinkRepository.save(new EmailLink(helloAssoOrder.getPayer().getEmail(), field.getAnswer()));
+                        }
+                    }
+                }
+            }
+        }
+        end.put(false, null);
         return end;
     }
 

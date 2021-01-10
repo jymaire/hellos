@@ -9,6 +9,7 @@ import java.util.List;
 public class HelloAssoOrder {
 
     private HelloAssoPayer payer;
+    private List<HelloAssoOrderItem> items;
     private List<HelloAssoPayment> payments;
     private HelloAssoAmount amount;
     private int id;
@@ -26,6 +27,14 @@ public class HelloAssoOrder {
 
     public void setPayer(HelloAssoPayer payer) {
         this.payer = payer;
+    }
+
+    public List<HelloAssoOrderItem> getItems() {
+        return items;
+    }
+
+    public void setItems(List<HelloAssoOrderItem> items) {
+        this.items = items;
     }
 
     public List<HelloAssoPayment> getPayments() {
@@ -88,6 +97,7 @@ public class HelloAssoOrder {
     public String toString() {
         return "HelloAssoOrder{" +
                 "payer=" + payer +
+                ",items=" + items +
                 ", payments=" + payments +
                 ", amount=" + amount +
                 ", id='" + id + '\'' +

@@ -1,6 +1,13 @@
 # Releases notes
 
+## 0.0.5
+
+- add possibility to have an email different between Hello Asso and Cyclos accounts (optional email in Hello Asso form)
+- add new status for automatic payments
+- fix : method "handleNewPayment" in "PaymentService" used to read email from configuration file instead of database
+
 ## 0.0.4
+
 * add administration panel to (des)activate automatic payments and payments into cyclos
 * add possibility to change email recipient also through panel admin
 * fix lot of small typo and bug possible situation (static code analysis)

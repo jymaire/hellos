@@ -12,8 +12,10 @@ import org.lagonette.hellos.bean.helloasso.notification.HelloAssoAmount;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotification;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotificationBody;
 import org.lagonette.hellos.entity.Configuration;
+import org.lagonette.hellos.entity.EmailLink;
 import org.lagonette.hellos.entity.Payment;
 import org.lagonette.hellos.repository.ConfigurationRepository;
+import org.lagonette.hellos.repository.EmailLinkRepository;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -38,6 +40,9 @@ class HelloAssoServiceTest {
 
     @Mock
     private ConfigurationRepository configurationRepository;
+
+    @Mock
+    private EmailLinkRepository emailLinkRepository;
 
     @Mock
     private PaymentRepository paymentRepository;
@@ -184,5 +189,35 @@ class HelloAssoServiceTest {
 
         // THEN
         assertThat(isValidPayment.containsKey(false)).isTrue();
+    }
+
+    @Test
+    void orderWithAlternativeEmail() throws IOException {
+        // GIVEN
+        String order = "{\"data\": {\"payer\": {\"dateOfBirth\": \"1970-01-08T00:00:00+01:00\", \"email\": \"helloasso@email.fr\", \"address\": \"1 rue de la republique\", \"city\": \"lyon\", \"zipCode\": \"69001\", \"country\": \"FRA\", \"firstName\": \"Jean\", \"lastName\": \"DUPONT\"}, \"items\": [{\"payments\": [{\"id\": 9628319, \"shareAmount\": 5000}], \"user\": {\"firstName\": \"Jean\", \"lastName\": \"DUPONT\"}, \"priceCategory\": \"Free\", \"customFields\": [{\"name\": \"Adresse courriel compte Cyclos ? (si diff\\u00e9rente de celle du compte Helloasso)\", \"type\": \"TextInput\", \"answer\": \"cyclos@email.fr\"}], \"isCanceled\": false, \"id\": 18801433, \"amount\": 5000, \"type\": \"Payment\", \"initialAmount\": 0, \"state\": \"Processed\"}], \"payments\": [{\"items\": [{\"id\": 18801433, \"shareAmount\": 5000, \"shareItemAmount\": 5000}], \"cashOutState\": \"Transfered\", \"paymentReceiptUrl\": \"https://www.helloasso.com/associations/url/form\", \"id\": 9628319, \"amount\": 5000, \"date\": \"2020-12-08T12:38:44.4010985+00:00\", \"paymentMeans\": \"Card\", \"state\": \"Authorized\"}], \"amount\": {\"total\": 5000, \"vat\": 0, \"discount\": 0}, \"id\": 18801433, \"date\": \"2020-12-08T12:38:44.4010985+00:00\", \"formSlug\": \"crediter-par-cb\", \"formType\": \"PaymentForm\", \"organizationSlug\": \"asso\"}, \"eventType\": \"Order\"}";
+        final HelloAssoPaymentNotification helloAssoPaymentNotification = mapper.readValue(order, HelloAssoPaymentNotification.class);
+        when(dotenv.get("HELLO_ASSO_EXTRA_MAIL_FIELD_NAME")).thenReturn("Adresse courriel compte Cyclos ? (si différente de celle du compte Helloasso)");
+
+        // WHEN
+        Map<Boolean, Notification> isValidPayment = helloAssoService.isValidPayment(helloAssoPaymentNotification);
+
+        // THEN
+        assertThat(isValidPayment.containsKey(false)).isTrue();
+        verify(emailLinkRepository).save(new EmailLink("helloasso@email.fr", "cyclos@email.fr"));
+    }
+
+    @Test
+    void orderWithOutAlternativeEmail() throws IOException {
+        // GIVEN
+        String order = "{\"data\": {\"payer\": {\"dateOfBirth\": \"1970-01-08T00:00:00+01:00\", \"email\": \"helloasso@email.fr\", \"address\": \"1 rue de la republique\", \"city\": \"lyon\", \"zipCode\": \"69001\", \"country\": \"FRA\", \"firstName\": \"Jean\", \"lastName\": \"DUPONT\"}, \"items\": [{\"payments\": [{\"id\": 9628319, \"shareAmount\": 5000}], \"user\": {\"firstName\": \"Jean\", \"lastName\": \"DUPONT\"}, \"priceCategory\": \"Free\", \"isCanceled\": false, \"id\": 18801433, \"amount\": 5000, \"type\": \"Payment\", \"initialAmount\": 0, \"state\": \"Processed\"}], \"payments\": [{\"items\": [{\"id\": 18801433, \"shareAmount\": 5000, \"shareItemAmount\": 5000}], \"cashOutState\": \"Transfered\", \"paymentReceiptUrl\": \"https://www.helloasso.com/associations/url/form\", \"id\": 9628319, \"amount\": 5000, \"date\": \"2020-12-08T12:38:44.4010985+00:00\", \"paymentMeans\": \"Card\", \"state\": \"Authorized\"}], \"amount\": {\"total\": 5000, \"vat\": 0, \"discount\": 0}, \"id\": 18801433, \"date\": \"2020-12-08T12:38:44.4010985+00:00\", \"formSlug\": \"crediter-par-cb\", \"formType\": \"PaymentForm\", \"organizationSlug\": \"asso\"}, \"eventType\": \"Order\"}";
+        final HelloAssoPaymentNotification helloAssoPaymentNotification = mapper.readValue(order, HelloAssoPaymentNotification.class);
+        when(dotenv.get("HELLO_ASSO_EXTRA_MAIL_FIELD_NAME")).thenReturn("Adresse courriel compte Cyclos ? (si différente de celle du compte Helloasso)");
+
+        // WHEN
+        Map<Boolean, Notification> isValidPayment = helloAssoService.isValidPayment(helloAssoPaymentNotification);
+
+        // THEN
+        assertThat(isValidPayment.containsKey(false)).isTrue();
+        verifyNoInteractions(emailLinkRepository);
     }
 }

@@ -17,8 +17,10 @@ import org.lagonette.hellos.bean.cyclos.CyclosPerformPaymentResponse;
 import org.lagonette.hellos.bean.cyclos.CyclosTransaction;
 import org.lagonette.hellos.bean.cyclos.CyclosUser;
 import org.lagonette.hellos.entity.Configuration;
+import org.lagonette.hellos.entity.EmailLink;
 import org.lagonette.hellos.entity.Payment;
 import org.lagonette.hellos.repository.ConfigurationRepository;
+import org.lagonette.hellos.repository.EmailLinkRepository;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -32,6 +34,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.lagonette.hellos.service.ConfigurationService.PAYMENT_CYCLOS_ENABLED;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,10 +46,10 @@ class CyclosServiceTest {
     private Dotenv dotenv;
 
     @Mock
-    private MailService mailService;
+    private ConfigurationRepository configurationRepository;
 
     @Mock
-    private ConfigurationRepository configurationRepository;
+    private EmailLinkRepository emailLinkRepository;
 
     @Mock
     private PaymentRepository paymentRepository;
@@ -180,5 +183,92 @@ class CyclosServiceTest {
         assertThat(finalProcessResult.getStatusPayment()).isEqualTo(StatusPaymentEnum.success);
         assertThat(finalProcessResult.getErrors()).isNotEmpty();
         assertThat(finalProcessResult.getErrors()).contains("Paiement déjà effectué dans Cyclos");
+    }
+
+    @Test
+    void creditAccount_accountNotFound() {
+        // GIVEN
+        CyclosUser cyclosUser = new CyclosUser();
+        CyclosGroup group = new CyclosGroup();
+        group.setInternalName("group-name");
+        cyclosUser.setGroup(group);
+
+        // Mock all HTTP calls
+        // first call, get user
+        mockBackEnd.enqueue(new MockResponse()
+                .addHeader("Content-Type", "application/json"));
+        mockBackEnd.enqueue(new MockResponse()
+                .addHeader("Content-Type", "application/json"));
+
+        payment = Payment.PaymentBuilder.aPayment().withEmail("email@email.fr").build();
+        when(paymentRepository.findById(1)).thenReturn(payment);
+        when(emailLinkRepository.findById("email@email.fr")).thenReturn(Optional.empty());
+
+        when(dotenv.get("CYCLOS_URL")).thenReturn(baseUrl);
+        when(dotenv.get("CYCLOS_USER")).thenReturn("user");
+        when(dotenv.get("CYCLOS_PWD")).thenReturn("pwd");
+
+        ProcessResult processResult = new ProcessResult();
+
+        // WHEN
+        final ProcessResult finalProcessResult = cyclosService.creditAccount(processResult, 1);
+
+        // THEN
+        assertThat(finalProcessResult.getStatusPayment()).isEqualTo(StatusPaymentEnum.fail);
+        assertThat(finalProcessResult.getErrors()).isNotEmpty();
+        verify(paymentRepository).findById(1);
+        verify(emailLinkRepository).findById("email@email.fr");
+    }
+
+    @Test
+    void creditAccount_accountNotFoundAtFirstTime() throws JsonProcessingException {
+        // GIVEN
+        ObjectMapper objectMapper = new ObjectMapper();
+        CyclosUser cyclosUser = new CyclosUser();
+        CyclosGroup group = new CyclosGroup();
+        group.setInternalName("group-name");
+        cyclosUser.setGroup(group);
+
+        // Mock all HTTP calls
+        // first call, get user, but not found
+        mockBackEnd.enqueue(new MockResponse()
+                .addHeader("Content-Type", "application/json"));
+        // then get user with the registered email
+        mockBackEnd.enqueue(new MockResponse()
+                .setBody(objectMapper.writeValueAsString(cyclosUser))
+                .addHeader("Content-Type", "application/json"));
+        // get previous transactions
+        List<CyclosTransaction> transactions = new ArrayList<>();
+        mockBackEnd.enqueue(new MockResponse()
+                .setBody(objectMapper.writeValueAsString(transactions))
+                .addHeader("Content-Type", "application/json"));
+        // post payment
+        CyclosPerformPaymentResponse paymentDone = new CyclosPerformPaymentResponse();
+        List<CyclosPerformPaymentResponse> cyclosPerformPaymentResponse = Collections.singletonList(paymentDone);
+        mockBackEnd.enqueue(new MockResponse()
+                .setBody(objectMapper.writeValueAsString(cyclosPerformPaymentResponse))
+                .addHeader("Content-Type", "application/json"));
+        payment = Payment.PaymentBuilder.aPayment().withEmail("email@email.fr").build();
+        when(emailLinkRepository.findById("email@email.fr")).thenReturn(Optional.of(new EmailLink("email@email.fr", "email2@email.fr")));
+        when(paymentRepository.findById(1)).thenReturn(payment);
+        when(dotenv.get("CYCLOS_EMISSION_PART_INTERNAL")).thenReturn("emission");
+        when(dotenv.get("CYCLOS_GROUP_PART_INTERNAL")).thenReturn("group-name");
+        when(dotenv.get("CYCLOS_GROUP_PRO_INTERNAL")).thenReturn("pro-group-name");
+
+        when(dotenv.get("CYCLOS_URL")).thenReturn(baseUrl);
+        when(dotenv.get("CYCLOS_USER")).thenReturn("user");
+        when(dotenv.get("CYCLOS_PWD")).thenReturn("pwd");
+
+        when(configurationRepository.findById(PAYMENT_CYCLOS_ENABLED)).thenReturn(Optional.of(new Configuration(PAYMENT_CYCLOS_ENABLED, "true")));
+        ProcessResult processResult = new ProcessResult();
+
+        // WHEN
+        final ProcessResult finalProcessResult = cyclosService.creditAccount(processResult, 1);
+
+        // THEN
+        assertThat(finalProcessResult.getStatusPayment()).isEqualTo(StatusPaymentEnum.success);
+        assertThat(finalProcessResult.getErrors()).isEmpty();
+        verify(paymentRepository).findById(1);
+        verify(emailLinkRepository).findById("email@email.fr");
     }
 }
