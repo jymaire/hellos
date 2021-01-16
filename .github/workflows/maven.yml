@@ -20,5 +20,7 @@ jobs:
       uses: actions/setup-java@v1
       with:
         java-version: 1.11
+    - name : cp env file
+      run: cp .env.dist .env
     - name: Build with Maven
       run: mvn test
