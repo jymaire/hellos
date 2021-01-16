@@ -8,8 +8,10 @@ import org.lagonette.hellos.bean.cyclos.CyclosPerformPaymentResponse;
 import org.lagonette.hellos.bean.cyclos.CyclosTransaction;
 import org.lagonette.hellos.bean.cyclos.CyclosUser;
 import org.lagonette.hellos.entity.Configuration;
+import org.lagonette.hellos.entity.EmailLink;
 import org.lagonette.hellos.entity.Payment;
 import org.lagonette.hellos.repository.ConfigurationRepository;
+import org.lagonette.hellos.repository.EmailLinkRepository;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +24,7 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunctions;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.lagonette.hellos.service.ConfigurationService.PAYMENT_CYCLOS_ENABLED;
 
@@ -31,14 +34,14 @@ public class CyclosService {
     private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 
     private final ConfigurationRepository configurationRepository;
+    private final EmailLinkRepository emailLinkRepository;
     private final PaymentRepository paymentRepository;
-    private final MailService mailService;
     private final Dotenv dotenv;
 
-    public CyclosService(ConfigurationRepository configurationRepository, PaymentRepository paymentRepository, MailService mailService, Dotenv dotenv) {
+    public CyclosService(ConfigurationRepository configurationRepository, EmailLinkRepository emailLinkRepository, PaymentRepository paymentRepository, Dotenv dotenv) {
         this.configurationRepository = configurationRepository;
+        this.emailLinkRepository = emailLinkRepository;
         this.paymentRepository = paymentRepository;
-        this.mailService = mailService;
         this.dotenv = dotenv;
     }
 
@@ -58,33 +61,40 @@ public class CyclosService {
                         .basicAuthentication(dotenv.get("CYCLOS_USER"), dotenv.get("CYCLOS_PWD")))
                 .build();
 
-        ResponseEntity<List<CyclosUser>> getUserResponse = webClient.get()
-                .uri("/users?fields=&keywords=" + payment.getEmail() + "&roles=member&statuses=active&includeGroup=true")
-                .accept(MediaType.APPLICATION_JSON)
-                .retrieve()
-                .toEntityList(CyclosUser.class)
-                .block();
+        ResponseEntity<List<CyclosUser>> getUserResponse = getCyclosUser(payment.getEmail(), webClient);
 
-        // TODO create a testable method to validate API return
-        if (getUserResponse == null || getUserResponse.getBody() == null || !getUserResponse.getStatusCode().is2xxSuccessful() || getUserResponse.getBody().size() != 1 || getUserResponse.getBody().get(0).getGroup() == null) {
-            processResult.setStatusPayment(StatusPaymentEnum.fail);
-            processResult.getErrors().add("Erreur pendant la récupération de l'utilisateur dans Cyclos, détails de la réponse : {} " + getUserResponse);
-            if (getUserResponse == null) {
+        if (isUserInvalid(getUserResponse)) {
+            // check if we have an alternative email in database
+            final Optional<EmailLink> emailLinkOptional = emailLinkRepository.findById(payment.getEmail());
+            if (emailLinkOptional.isPresent()) {
+                getUserResponse = getCyclosUser(emailLinkOptional.get().getCyclosEmail(), webClient);
+                if (isUserInvalid(getUserResponse)) {
+                    LOGGER.warn("Error getting Cyclos user from alternative email");
+                    processResult.getErrors().add("Erreur pendant la récupération de l'utilisateur dans Cyclos(email alternatif) ");
+                    processResult.setStatusPayment(StatusPaymentEnum.fail);
+                    return processResult;
+                }
+                // if user is valid, we just exit this part and continue the process, otherwise add an error and end process
+            } else {
+                processResult.setStatusPayment(StatusPaymentEnum.fail);
+                processResult.getErrors().add("Erreur pendant la récupération de l'utilisateur dans Cyclos, détails de la réponse");
+                if (getUserResponse == null) {
+                    processResult.setStatusPayment(StatusPaymentEnum.fail);
+                    return processResult;
+                }
+                LOGGER.info("Status code is successful : {}", getUserResponse.getStatusCode().is2xxSuccessful());
+                if (getUserResponse.getBody() != null) {
+                    LOGGER.info("Body size : {}", getUserResponse.getBody().size());
+                }
+                LOGGER.debug("Body content : {}", getUserResponse.getBody());
+                if (!CollectionUtils.isEmpty(getUserResponse.getBody())) {
+                    LOGGER.info("User group : {}", getUserResponse.getBody().get(0).getGroup());
+                } else {
+                    LOGGER.info("Body empty, can't debug group");
+                }
                 processResult.setStatusPayment(StatusPaymentEnum.fail);
                 return processResult;
             }
-            LOGGER.info("Status code is successful : {}", getUserResponse.getStatusCode().is2xxSuccessful());
-            if (getUserResponse.getBody() != null) {
-                LOGGER.info("Body size : {}", getUserResponse.getBody().size());
-            }
-            LOGGER.debug("Body content : {}", getUserResponse.getBody());
-            if (!CollectionUtils.isEmpty(getUserResponse.getBody())) {
-                LOGGER.info("User group : {}", getUserResponse.getBody().get(0).getGroup());
-            } else {
-                LOGGER.info("Body empty, can't debug group");
-            }
-            processResult.setStatusPayment(StatusPaymentEnum.fail);
-            return processResult;
         }
         CyclosUser cyclosUser = getUserResponse.getBody().get(0);
         String type;
@@ -132,6 +142,19 @@ public class CyclosService {
             processResult.setStatusPayment(StatusPaymentEnum.previewOK);
         }
         return processResult;
+    }
+
+    private boolean isUserInvalid(ResponseEntity<List<CyclosUser>> cyclosUserSecondAttempt) {
+        return cyclosUserSecondAttempt == null || cyclosUserSecondAttempt.getBody() == null || !cyclosUserSecondAttempt.getStatusCode().is2xxSuccessful() || cyclosUserSecondAttempt.getBody().size() != 1 || cyclosUserSecondAttempt.getBody().get(0).getGroup() == null;
+    }
+
+    private ResponseEntity<List<CyclosUser>> getCyclosUser(String email, WebClient webClient) {
+        return webClient.get()
+                .uri("/users?fields=&keywords=" + email + "&roles=member&statuses=active&includeGroup=true")
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .toEntityList(CyclosUser.class)
+                .block();
     }
 
     private boolean checkPaymentIsAlreadyDone(int id, String email, WebClient webClient) {

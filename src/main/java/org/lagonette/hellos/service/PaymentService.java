@@ -71,11 +71,13 @@ public class PaymentService {
             if ("true".equals(configurationRepository.findById(PAYMENT_AUTOMATIC_ENABLED).orElse(new Configuration(PAYMENT_AUTOMATIC_ENABLED, "false")).getValue())) {
                 LOGGER.info("automatic payment to be proceed");
                 processResult = creditCyclosAccount(processResult, paymentSaved);
+                final Configuration mailRecipientConfiguration = configurationRepository.findById(MAIL_RECIPIENT).orElse(new Configuration(MAIL_RECIPIENT, dotenv.get("MAIL_RECIPIENT")));
                 if (StatusPaymentEnum.success.equals(processResult.getStatusPayment())) {
-                    mailService.sendEmail(dotenv.get("MAIL_RECIPIENT"), "[Hellos] Paiement réussi :)",
+                    mailService.sendEmail(mailRecipientConfiguration.getValue(), "[Hellos] Paiement réussi :)",
                             "Un paiement a été effectué avec succès.\nId : " + paymentSaved.getId());
+                    processResult.setStatusPayment(StatusPaymentEnum.successAuto);
                 } else {
-                    mailService.sendEmail(dotenv.get("MAIL_RECIPIENT"), "[Hellos] Paiement en échec :(",
+                    mailService.sendEmail(mailRecipientConfiguration.getValue(), "[Hellos] Paiement en échec :(",
                             "Un paiement n'a pas pu être effectué.\nId : " + paymentSaved.getId());
                 }
             }

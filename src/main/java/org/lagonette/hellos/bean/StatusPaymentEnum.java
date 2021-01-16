@@ -5,6 +5,7 @@ public enum StatusPaymentEnum {
     tooHigh("Montant trop haut"),
     previewOK("Reactiver les paiements pour effectuer le paiement"),
     success("Succès"),
+    successAuto("Succès (automatique)"),
     fail("Echec");
 
     private final String label;

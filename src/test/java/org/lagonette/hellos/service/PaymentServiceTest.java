@@ -230,5 +230,4 @@ class PaymentServiceTest {
         verify(cyclosService, times(1)).creditAccount(processResult, 2);
         verify(mailService).sendEmail(eq("mail@mail.com"), eq("[Hellos] Erreur lors du traitement"), anyString());
     }
-
 }

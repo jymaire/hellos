@@ -1,5 +1,6 @@
 package org.lagonette.hellos.service;
 
+import org.lagonette.hellos.repository.EmailLinkRepository;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,11 +15,17 @@ import java.util.List;
 @Component
 public class PurgeDatabaseService {
     private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
-    private final PaymentRepository paymentRepository;
-    @Value("${database.retention.days}")
-    private int nbOfDays;
 
-    public PurgeDatabaseService(PaymentRepository paymentRepository) {
+    private final EmailLinkRepository emailLinkRepository;
+    private final PaymentRepository paymentRepository;
+
+    @Value("${database.retention.payment.days}")
+    private int nbOfDaysForPayments;
+    @Value("${database.retention.email.days}")
+    private int nbOfDaysForEmails;
+
+    public PurgeDatabaseService(EmailLinkRepository emailLinkRepository, PaymentRepository paymentRepository) {
+        this.emailLinkRepository = emailLinkRepository;
         this.paymentRepository = paymentRepository;
     }
 
@@ -27,12 +34,23 @@ public class PurgeDatabaseService {
     @Scheduled(cron = "${database.purge.cron}")
     public void purgeDatabase() {
         LOGGER.info("Begin of the database purge");
-        List<Integer> paymentsToDelete = paymentRepository.findIdsByInsertionDateBefore(LocalDateTime.now().minusDays(nbOfDays));
-        int size = paymentsToDelete.size();
-        LOGGER.info("{} records to delete", size);
-        if (size > 0) {
+
+        // Payment purge
+        List<Integer> paymentsToDelete = paymentRepository.findIdsByInsertionDateBefore(LocalDateTime.now().minusDays(nbOfDaysForPayments));
+        int paymentsSize = paymentsToDelete.size();
+        LOGGER.info("{} records of payments to delete", paymentsSize);
+        if (paymentsSize > 0) {
             paymentRepository.deleteById(paymentsToDelete);
         }
+
+        // Email purge
+        List<String> emailsToDelete = emailLinkRepository.findIdsByInsertionDateBefore(LocalDateTime.now().minusDays(nbOfDaysForEmails));
+        int emailsSize = emailsToDelete.size();
+        LOGGER.info("{} records of emails to delete", emailsSize);
+        if (emailsSize > 0) {
+            emailLinkRepository.deleteById(emailsToDelete);
+        }
+
         LOGGER.info("End of the database purge");
     }
 }
