@@ -82,7 +82,7 @@ class HelloAssoServiceTest {
 
         // THEN
         assertThat(isValidPayment.containsKey(true)).isTrue();
-        assertThat(isValidPayment.get(true).getDate()).isEqualTo("14 nov. 2020 11:13:12");
+        assertThat(isValidPayment.get(true).getDate()).isEqualTo("14 Nov 2020 11:13:12");
     }
 
     @Test
