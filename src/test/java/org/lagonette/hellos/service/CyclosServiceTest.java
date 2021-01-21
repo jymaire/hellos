@@ -17,10 +17,8 @@ import org.lagonette.hellos.bean.cyclos.CyclosPerformPaymentResponse;
 import org.lagonette.hellos.bean.cyclos.CyclosTransaction;
 import org.lagonette.hellos.bean.cyclos.CyclosUser;
 import org.lagonette.hellos.entity.Configuration;
-import org.lagonette.hellos.entity.EmailLink;
 import org.lagonette.hellos.entity.Payment;
 import org.lagonette.hellos.repository.ConfigurationRepository;
-import org.lagonette.hellos.repository.EmailLinkRepository;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -49,10 +47,10 @@ class CyclosServiceTest {
     private ConfigurationRepository configurationRepository;
 
     @Mock
-    private EmailLinkRepository emailLinkRepository;
+    private PaymentRepository paymentRepository;
 
     @Mock
-    private PaymentRepository paymentRepository;
+    private HelloAssoService helloAssoService;
 
     @InjectMocks
     private CyclosService cyclosService;
@@ -200,13 +198,12 @@ class CyclosServiceTest {
         mockBackEnd.enqueue(new MockResponse()
                 .addHeader("Content-Type", "application/json"));
 
-        payment = Payment.PaymentBuilder.aPayment().withEmail("email@email.fr").build();
+        payment = Payment.PaymentBuilder.aPayment().withId(1).withEmail("email@email.fr").build();
         when(paymentRepository.findById(1)).thenReturn(payment);
-        when(emailLinkRepository.findById("email@email.fr")).thenReturn(Optional.empty());
-
         when(dotenv.get("CYCLOS_URL")).thenReturn(baseUrl);
         when(dotenv.get("CYCLOS_USER")).thenReturn("user");
         when(dotenv.get("CYCLOS_PWD")).thenReturn("pwd");
+        when(helloAssoService.getAlternativeEmailFromPayment(1)).thenReturn("erreur");
 
         ProcessResult processResult = new ProcessResult();
 
@@ -217,7 +214,6 @@ class CyclosServiceTest {
         assertThat(finalProcessResult.getStatusPayment()).isEqualTo(StatusPaymentEnum.fail);
         assertThat(finalProcessResult.getErrors()).isNotEmpty();
         verify(paymentRepository).findById(1);
-        verify(emailLinkRepository).findById("email@email.fr");
     }
 
     @Test
@@ -248,8 +244,7 @@ class CyclosServiceTest {
         mockBackEnd.enqueue(new MockResponse()
                 .setBody(objectMapper.writeValueAsString(cyclosPerformPaymentResponse))
                 .addHeader("Content-Type", "application/json"));
-        payment = Payment.PaymentBuilder.aPayment().withEmail("email@email.fr").build();
-        when(emailLinkRepository.findById("email@email.fr")).thenReturn(Optional.of(new EmailLink("email@email.fr", "email2@email.fr")));
+        payment = Payment.PaymentBuilder.aPayment().withId(1).withEmail("email@email.fr").build();
         when(paymentRepository.findById(1)).thenReturn(payment);
         when(dotenv.get("CYCLOS_EMISSION_PART_INTERNAL")).thenReturn("emission");
         when(dotenv.get("CYCLOS_GROUP_PART_INTERNAL")).thenReturn("group-name");
@@ -258,6 +253,7 @@ class CyclosServiceTest {
         when(dotenv.get("CYCLOS_URL")).thenReturn(baseUrl);
         when(dotenv.get("CYCLOS_USER")).thenReturn("user");
         when(dotenv.get("CYCLOS_PWD")).thenReturn("pwd");
+        when(helloAssoService.getAlternativeEmailFromPayment(1)).thenReturn("altenate@email.fr");
 
         when(configurationRepository.findById(PAYMENT_CYCLOS_ENABLED)).thenReturn(Optional.of(new Configuration(PAYMENT_CYCLOS_ENABLED, "true")));
         ProcessResult processResult = new ProcessResult();
@@ -269,6 +265,5 @@ class CyclosServiceTest {
         assertThat(finalProcessResult.getStatusPayment()).isEqualTo(StatusPaymentEnum.success);
         assertThat(finalProcessResult.getErrors()).isEmpty();
         verify(paymentRepository).findById(1);
-        verify(emailLinkRepository).findById("email@email.fr");
     }
 }

@@ -124,4 +124,90 @@ public class HelloAssoPayment {
                 ", amount=" + amount +
                 '}';
     }
+
+    public static final class HelloAssoPaymentBuilder {
+        private HelloAssoPayer payer;
+        private HelloAssoOrder order;
+        private String id;
+        private String date;
+        // amount is in cents
+        private int amount;
+        private PaymentStateEnum state;
+        private String url;
+        private String payer_first_name;
+        private String payer_last_name;
+        private String actionId;
+
+        private HelloAssoPaymentBuilder() {
+        }
+
+        public static HelloAssoPaymentBuilder aHelloAssoPayment() {
+            return new HelloAssoPaymentBuilder();
+        }
+
+        public HelloAssoPaymentBuilder withPayer(HelloAssoPayer payer) {
+            this.payer = payer;
+            return this;
+        }
+
+        public HelloAssoPaymentBuilder withOrder(HelloAssoOrder order) {
+            this.order = order;
+            return this;
+        }
+
+        public HelloAssoPaymentBuilder withId(String id) {
+            this.id = id;
+            return this;
+        }
+
+        public HelloAssoPaymentBuilder withDate(String date) {
+            this.date = date;
+            return this;
+        }
+
+        public HelloAssoPaymentBuilder withAmount(int amount) {
+            this.amount = amount;
+            return this;
+        }
+
+        public HelloAssoPaymentBuilder withState(PaymentStateEnum state) {
+            this.state = state;
+            return this;
+        }
+
+        public HelloAssoPaymentBuilder withUrl(String url) {
+            this.url = url;
+            return this;
+        }
+
+        public HelloAssoPaymentBuilder withPayer_first_name(String payer_first_name) {
+            this.payer_first_name = payer_first_name;
+            return this;
+        }
+
+        public HelloAssoPaymentBuilder withPayer_last_name(String payer_last_name) {
+            this.payer_last_name = payer_last_name;
+            return this;
+        }
+
+        public HelloAssoPaymentBuilder withActionId(String actionId) {
+            this.actionId = actionId;
+            return this;
+        }
+
+        public HelloAssoPayment build() {
+            HelloAssoPayment helloAssoPayment = new HelloAssoPayment();
+            helloAssoPayment.setPayer(payer);
+            helloAssoPayment.setOrder(order);
+            helloAssoPayment.setId(id);
+            helloAssoPayment.setDate(date);
+            helloAssoPayment.setAmount(amount);
+            helloAssoPayment.setState(state);
+            helloAssoPayment.setUrl(url);
+            helloAssoPayment.setPayer_first_name(payer_first_name);
+            helloAssoPayment.setPayer_last_name(payer_last_name);
+            helloAssoPayment.setActionId(actionId);
+            return helloAssoPayment;
+        }
+    }
 }

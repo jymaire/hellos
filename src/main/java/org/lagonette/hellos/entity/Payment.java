@@ -6,6 +6,7 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 import static org.lagonette.hellos.bean.StatusPaymentEnum.todo;
 
@@ -91,6 +92,19 @@ public class Payment {
 
     public void setStatus(StatusPaymentEnum status) {
         this.status = status;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Payment payment = (Payment) o;
+        return id == payment.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
     }
 
     @Override

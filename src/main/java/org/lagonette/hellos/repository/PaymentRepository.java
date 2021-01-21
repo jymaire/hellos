@@ -14,6 +14,9 @@ public interface PaymentRepository extends CrudRepository<Payment, Long> {
     @Query("SELECT p FROM Payment p ORDER BY p.date DESC")
     List<Payment> findAll();
 
+    @Query("SELECT p.id FROM Payment p")
+    List<Integer> findAllIds();
+
     Payment findById(int id);
 
     Payment save(@NotNull Payment payment);

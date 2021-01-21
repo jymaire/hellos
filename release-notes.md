@@ -1,5 +1,11 @@
 # Releases notes
 
+## 0.0.6
+- add a button to manually fetch payments from Hello Asso (located in admin panel)
+- add some documentation with screenshots
+- change the mechanism to get email when it is different between Hello Asso and Cyclos accounts 
+(on the fly, no more storage of emails in the database)
+
 ## 0.0.5
 
 - add possibility to have an email different between Hello Asso and Cyclos accounts (optional email in Hello Asso form)
