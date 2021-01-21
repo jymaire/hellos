@@ -11,6 +11,11 @@
 <i>Un grand pouvoir engendre de grandes responsabilités.</i>
 <div class="align-div">
     <div>
+        <div class="right fetch-data" id="fetch">
+            <form method="GET" th:action="@{/fetch}">
+                <input type="submit" value="Synchro Hello Asso"/>
+            </form>
+        </div>
         <div class="right admin" id="admin">
             <button onclick="window.location.href='list';">Retour liste paiements</button>
         </div>

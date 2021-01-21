@@ -85,4 +85,20 @@ class PaymentRepositoryTest {
         assertThat(withDateOlderThan.size()).isEqualTo(2);
         assertThat(withDateOlderThan.get(0).getId()).isEqualTo(2);
     }
+
+    @Test
+    void shouldFindAllId() {
+        // GIVEN
+        paymentRepository.save(Payment.PaymentBuilder.aPayment().withId(1).build());
+        paymentRepository.save(Payment.PaymentBuilder.aPayment().withId(2).build());
+        paymentRepository.save(Payment.PaymentBuilder.aPayment().withId(3).build());
+
+        // WHEN
+        List<Integer> ids = paymentRepository.findAllIds();
+        // THEN
+        assertThat(ids).isNotEmpty();
+        assertThat(ids.size()).isEqualTo(3);
+        assertThat(ids).containsAnyOf(1, 2, 3);
+    }
+
 }

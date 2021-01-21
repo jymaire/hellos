@@ -27,7 +27,7 @@ public class LoadConfiguration {
             final String emailRecipient = dotenv.get("MAIL_RECIPIENT");
             repository.save(new org.lagonette.hellos.entity.Configuration("MAIL_RECIPIENT", emailRecipient));
             var all = repository.findAll();
-            LOGGER.info("Configuration loaded : {}", all);
+            LOGGER.debug("Configuration loaded : {}", all);
         };
     }
 }

@@ -20,6 +20,9 @@ Pour Cyclos, vous allez devoir créer un utilisateur technique (meilleurs pratiq
 Le plus simple est de créer un nouveau groupe (nommé "Utilisateur technique" par exemple) et d'y associer les bons droits.
 À rajouter :
 * l'autorisation au canal 'Web services'
+
+Dans Système > Types de comptes > Emission ...> Types de transfert > Détails du type de transfert > Applicability > Canaux, la ligne Services API doit être cochée.
+Sinon une erreur code 422 est retournée
 * l'autorisation de paiement "système vers utilisateurs"
 * l'accès aux différents groupes des utilisateurs pouvant recevoir des paiements
 

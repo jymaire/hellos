@@ -8,10 +8,8 @@ import org.lagonette.hellos.bean.cyclos.CyclosPerformPaymentResponse;
 import org.lagonette.hellos.bean.cyclos.CyclosTransaction;
 import org.lagonette.hellos.bean.cyclos.CyclosUser;
 import org.lagonette.hellos.entity.Configuration;
-import org.lagonette.hellos.entity.EmailLink;
 import org.lagonette.hellos.entity.Payment;
 import org.lagonette.hellos.repository.ConfigurationRepository;
-import org.lagonette.hellos.repository.EmailLinkRepository;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +22,6 @@ import org.springframework.web.reactive.function.client.ExchangeFilterFunctions;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.lagonette.hellos.service.ConfigurationService.PAYMENT_CYCLOS_ENABLED;
 
@@ -33,14 +30,14 @@ public class CyclosService {
     public static final String DESCRIPTION = "Paiement automatique, id technique ";
     private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 
+    private final HelloAssoService helloAssoService;
     private final ConfigurationRepository configurationRepository;
-    private final EmailLinkRepository emailLinkRepository;
     private final PaymentRepository paymentRepository;
     private final Dotenv dotenv;
 
-    public CyclosService(ConfigurationRepository configurationRepository, EmailLinkRepository emailLinkRepository, PaymentRepository paymentRepository, Dotenv dotenv) {
+    public CyclosService(HelloAssoService helloAssoService, ConfigurationRepository configurationRepository, PaymentRepository paymentRepository, Dotenv dotenv) {
+        this.helloAssoService = helloAssoService;
         this.configurationRepository = configurationRepository;
-        this.emailLinkRepository = emailLinkRepository;
         this.paymentRepository = paymentRepository;
         this.dotenv = dotenv;
     }
@@ -60,24 +57,25 @@ public class CyclosService {
                 .filter(ExchangeFilterFunctions
                         .basicAuthentication(dotenv.get("CYCLOS_USER"), dotenv.get("CYCLOS_PWD")))
                 .build();
-
+        String accurateEmail = payment.getEmail();
         ResponseEntity<List<CyclosUser>> getUserResponse = getCyclosUser(payment.getEmail(), webClient);
 
         if (isUserInvalid(getUserResponse)) {
             // check if we have an alternative email in database
-            final Optional<EmailLink> emailLinkOptional = emailLinkRepository.findById(payment.getEmail());
-            if (emailLinkOptional.isPresent()) {
-                getUserResponse = getCyclosUser(emailLinkOptional.get().getCyclosEmail(), webClient);
+            final String alternativeEmail = helloAssoService.getAlternativeEmailFromPayment(payment.getId());
+            if (alternativeEmail.contains("@")) {
+                getUserResponse = getCyclosUser(alternativeEmail, webClient);
                 if (isUserInvalid(getUserResponse)) {
                     LOGGER.warn("Error getting Cyclos user from alternative email");
                     processResult.getErrors().add("Erreur pendant la récupération de l'utilisateur dans Cyclos(email alternatif) ");
                     processResult.setStatusPayment(StatusPaymentEnum.fail);
                     return processResult;
                 }
+                accurateEmail = alternativeEmail;
                 // if user is valid, we just exit this part and continue the process, otherwise add an error and end process
             } else {
                 processResult.setStatusPayment(StatusPaymentEnum.fail);
-                processResult.getErrors().add("Erreur pendant la récupération de l'utilisateur dans Cyclos, détails de la réponse");
+                processResult.getErrors().add("Erreur pendant la récupération de l'utilisateur dans Cyclos, détails de la réponse " + alternativeEmail);
                 if (getUserResponse == null) {
                     processResult.setStatusPayment(StatusPaymentEnum.fail);
                     return processResult;
@@ -109,7 +107,7 @@ public class CyclosService {
         }
         // get last payment and check description
 
-        if (checkPaymentIsAlreadyDone(id, payment.getEmail(), webClient)) {
+        if (checkPaymentIsAlreadyDone(id, accurateEmail, webClient)) {
             processResult.setStatusPayment(StatusPaymentEnum.fail);
             processResult.getErrors().add("Paiement déjà réalisé dans Cyclos");
             return processResult;
@@ -123,7 +121,7 @@ public class CyclosService {
 
         ResponseEntity<List<CyclosPerformPaymentResponse>> paymentResponse = webClient.post()
                 .uri(paymentUrl)
-                .body(BodyInserters.fromValue(new CyclosPerformPayment(Float.toString(payment.getAmount()), payment.getEmail(), DESCRIPTION + payment.getId(), type)))
+                .body(BodyInserters.fromValue(new CyclosPerformPayment(Float.toString(payment.getAmount()), accurateEmail, DESCRIPTION + payment.getId(), type)))
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .toEntityList(CyclosPerformPaymentResponse.class)

@@ -71,4 +71,68 @@ public class HelloAssoPayer {
     public void setLastName(String lastName) {
         this.lastName = lastName;
     }
+
+    public static final class HelloAssoPayerBuilder {
+        private String email;
+        private String address;
+        private String city;
+        private String zipCode;
+        private String country;
+        private String firstName;
+        private String lastName;
+
+        private HelloAssoPayerBuilder() {
+        }
+
+        public static HelloAssoPayerBuilder aHelloAssoPayer() {
+            return new HelloAssoPayerBuilder();
+        }
+
+        public HelloAssoPayerBuilder withEmail(String email) {
+            this.email = email;
+            return this;
+        }
+
+        public HelloAssoPayerBuilder withAddress(String address) {
+            this.address = address;
+            return this;
+        }
+
+        public HelloAssoPayerBuilder withCity(String city) {
+            this.city = city;
+            return this;
+        }
+
+        public HelloAssoPayerBuilder withZipCode(String zipCode) {
+            this.zipCode = zipCode;
+            return this;
+        }
+
+        public HelloAssoPayerBuilder withCountry(String country) {
+            this.country = country;
+            return this;
+        }
+
+        public HelloAssoPayerBuilder withFirstName(String firstName) {
+            this.firstName = firstName;
+            return this;
+        }
+
+        public HelloAssoPayerBuilder withLastName(String lastName) {
+            this.lastName = lastName;
+            return this;
+        }
+
+        public HelloAssoPayer build() {
+            HelloAssoPayer helloAssoPayer = new HelloAssoPayer();
+            helloAssoPayer.setEmail(email);
+            helloAssoPayer.setAddress(address);
+            helloAssoPayer.setCity(city);
+            helloAssoPayer.setZipCode(zipCode);
+            helloAssoPayer.setCountry(country);
+            helloAssoPayer.setFirstName(firstName);
+            helloAssoPayer.setLastName(lastName);
+            return helloAssoPayer;
+        }
+    }
 }

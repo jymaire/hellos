@@ -5,28 +5,31 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.cdimascio.dotenv.Dotenv;
 import org.lagonette.hellos.bean.Notification;
 import org.lagonette.hellos.bean.StatusPaymentEnum;
-import org.lagonette.hellos.bean.helloasso.HelloAssoItemCustomField;
-import org.lagonette.hellos.bean.helloasso.HelloAssoOrderItem;
-import org.lagonette.hellos.bean.helloasso.HelloAssoPaymentStateEnum;
-import org.lagonette.hellos.bean.helloasso.notification.HelloAssoOrderNotificationBody;
+import org.lagonette.hellos.bean.helloasso.*;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotification;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotificationBody;
-import org.lagonette.hellos.entity.EmailLink;
 import org.lagonette.hellos.entity.Payment;
 import org.lagonette.hellos.repository.ConfigurationRepository;
-import org.lagonette.hellos.repository.EmailLinkRepository;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientException;
+import reactor.netty.http.client.HttpClient;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static org.lagonette.hellos.service.ConfigurationService.MAIL_RECIPIENT;
 
@@ -37,14 +40,12 @@ public class HelloAssoService {
 
     private final MailService mailService;
     private final Dotenv dotenv;
-    private final EmailLinkRepository emailLinkRepository;
     private final PaymentRepository paymentRepository;
     private final ConfigurationRepository configurationRepository;
 
-    public HelloAssoService(Dotenv dotenv, MailService mailService, EmailLinkRepository emailLinkRepository, PaymentRepository paymentRepository, ConfigurationRepository configurationRepository) {
+    public HelloAssoService(Dotenv dotenv, MailService mailService, PaymentRepository paymentRepository, ConfigurationRepository configurationRepository) {
         this.dotenv = dotenv;
         this.mailService = mailService;
-        this.emailLinkRepository = emailLinkRepository;
         this.paymentRepository = paymentRepository;
         this.configurationRepository = configurationRepository;
     }
@@ -78,7 +79,10 @@ public class HelloAssoService {
                         .withId(helloAssoPayment.getId())
                         .build();
             } else if (helloAssoPaymentNotification.getEventType().equals("Order")) {
-                return processOrder(helloAssoPaymentNotification, end, objectMapper);
+                // both a payment and an order notifications are sent, only process one
+                LOGGER.debug("do not prcess order, in order to avoid double credit");
+                end.put(false, null);
+                return end;
             } else {
                 LOGGER.error("Error during event type choice : {}", helloAssoPaymentNotification);
                 end.put(false, null);
@@ -102,40 +106,17 @@ public class HelloAssoService {
         }
 
         // convert date to an easier format to read for human
-        final LocalDateTime dateTime = LocalDateTime.parse(notification.getDate(), DateTimeFormatter.ISO_DATE_TIME);
-        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss");
-        String dateWithEasyToReadFormat = dateTime.format(dateTimeFormatter);
+        String dateWithEasyToReadFormat = formatDate(notification.getDate());
         notification.setDate(dateWithEasyToReadFormat);
 
         end.put(true, notification);
         return end;
     }
 
-    private Map<Boolean, Notification> processOrder(HelloAssoPaymentNotification helloAssoPaymentNotification, Map<Boolean, Notification> end, ObjectMapper objectMapper) throws IOException {
-        // both a payment and an order notifications are sent, only process one
-        LOGGER.debug("do not prcess order, in order to avoid double credit");
-        // but record, if there is one, the email linked to the Cyclos account
-        byte[] json = objectMapper.writeValueAsBytes(helloAssoPaymentNotification.getData());
-        HelloAssoOrderNotificationBody helloAssoOrder = objectMapper.readValue(json, HelloAssoOrderNotificationBody.class);
-        if (helloAssoOrder != null && !CollectionUtils.isEmpty(helloAssoOrder.getItems())) {
-            final String fieldName = dotenv.get("HELLO_ASSO_EXTRA_MAIL_FIELD_NAME");
-            if (fieldName == null) {
-                LOGGER.debug("Value for HELLO_ASSO_EXTRA_MAIL_FIELD_NAME is not set");
-                end.put(false, null);
-                return end;
-            }
-            for (HelloAssoOrderItem item : helloAssoOrder.getItems()) {
-                if (!CollectionUtils.isEmpty(item.getCustomFields())) {
-                    for (HelloAssoItemCustomField field : item.getCustomFields()) {
-                        if (fieldName.equals(field.getName())) {
-                            emailLinkRepository.save(new EmailLink(helloAssoOrder.getPayer().getEmail(), field.getAnswer()));
-                        }
-                    }
-                }
-            }
-        }
-        end.put(false, null);
-        return end;
+    private String formatDate(String date) {
+        final LocalDateTime dateTime = LocalDateTime.parse(date, DateTimeFormatter.ISO_DATE_TIME);
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        return dateTime.format(dateTimeFormatter);
     }
 
     private boolean validatePaymentNotification(HelloAssoPaymentNotification helloAssoPaymentNotification, HelloAssoPaymentNotificationBody helloAssoPayment) {
@@ -169,5 +150,124 @@ public class HelloAssoService {
             return true;
         }
         return false;
+    }
+
+    public void getPaymentsFor(int nbDays) throws IllegalAccessException {
+        String token = getHelloAssoAccessToken();
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime beginDate = now.minusDays(nbDays);
+
+        ResponseEntity<HelloAssoFormPayments> formResponse;
+        try {
+            formResponse = callPaymentFormHistory(token, now, beginDate);
+        } catch (WebClientException exception) {
+            LOGGER.error("error during data fetch : {}", exception.getCause().getMessage());
+            return;
+        }
+
+        Set<Payment> paymentsToSave = new HashSet<>();
+        final List<Integer> allPayments = paymentRepository.findAllIds();
+        if (formResponse != null && formResponse.getBody() != null && formResponse.getBody().getData() != null) {
+            formResponse.getBody().getData()
+                    .stream()
+                    .filter(o -> !allPayments.contains(Integer.parseInt(o.getId())))
+                    .forEach(helloAssoPayment -> paymentsToSave
+                            .add(new Payment(Integer.parseInt(helloAssoPayment.getId()), formatDate(helloAssoPayment.getDate()), (float) helloAssoPayment.getAmount() / (float) 100,
+                                    helloAssoPayment.getPayer().getFirstName(), helloAssoPayment.getPayer().getLastName(), helloAssoPayment.getPayer().getEmail())));
+            paymentRepository.saveAll(paymentsToSave);
+        }
+    }
+
+    public ResponseEntity<HelloAssoFormPayments> callPaymentFormHistory(String accessToken, LocalDateTime now, LocalDateTime beginDate) {
+        return WebClient.builder().build().get()
+                .uri(dotenv.get("HELLO_ASSO_API_URL") + "v5/organizations/" + dotenv.get("HELLO_ASSO_ORGANIZATION") +
+                        "/forms/PaymentForm/" + dotenv.get("HELLO_ASSO_FORM") + "/payments?from=" + beginDate + "&to=" + now + "&states=Authorized")
+                .header("authorization", "Bearer " + accessToken)
+                .retrieve()
+                .toEntity(HelloAssoFormPayments.class)
+                .block();
+    }
+
+    private String getHelloAssoAccessToken() throws IllegalAccessException {
+        LOGGER.debug("get access token");
+
+        MultiValueMap accessTokenBody = new LinkedMultiValueMap();
+        accessTokenBody.add("client_id", dotenv.get("HELLO_ASSO_CLIENT_ID"));
+        accessTokenBody.add("client_secret", dotenv.get("HELLO_ASSO_CLIENT_SECRET"));
+        accessTokenBody.add("grant_type", "client_credentials");
+        HttpClient httpClient = HttpClient
+                .create()
+                .wiretap(true);
+        HelloAssoToken accessTokenResponse = WebClient.builder()
+                .clientConnector(new ReactorClientHttpConnector(httpClient)).build().post()
+                .uri(dotenv.get("HELLO_ASSO_API_URL") + "oauth2/token")
+                .accept(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData(accessTokenBody))
+                .accept(MediaType.APPLICATION_JSON)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .retrieve()
+                .bodyToMono(HelloAssoToken.class)
+                .block();
+
+        if (accessTokenResponse == null || accessTokenResponse.getAccess_token() == null) {
+            LOGGER.error("Erreur lors de la récupération du token : \n{}", accessTokenResponse);
+            throw new IllegalAccessException("First access token error");
+        }
+        return accessTokenResponse.getAccess_token();
+    }
+
+    public String getAlternativeEmailFromPayment(int paymentId) {
+        String token;
+        try {
+            token = getHelloAssoAccessToken();
+        } catch (IllegalAccessException e) {
+            LOGGER.error("Error during token fetch: {}", e.getMessage());
+            return "token-error";
+        }
+        final ResponseEntity<HelloAssoPayment> paymentResponse = WebClient.builder().build().get()
+                .uri(dotenv.get("HELLO_ASSO_API_URL") + "v5/payments/" + paymentId)
+                .header("authorization", "Bearer " + token)
+                .retrieve()
+                .toEntity(HelloAssoPayment.class)
+                .block();
+
+        if (paymentResponse != null && paymentResponse.getStatusCode().is2xxSuccessful()
+                && paymentResponse.getBody() != null && paymentResponse.getBody().getOrder() != null) {
+            final int orderId = paymentResponse.getBody().getOrder().getId();
+            final ResponseEntity<HelloAssoOrder> orderResponse = WebClient.builder().build().get()
+                    .uri(dotenv.get("HELLO_ASSO_API_URL") + "v5/orders/" + orderId)
+                    .header("authorization", "Bearer " + token)
+                    .retrieve()
+                    .toEntity(HelloAssoOrder.class)
+                    .block();
+            if (orderResponse != null && orderResponse.getStatusCode().is2xxSuccessful() && orderResponse.getBody() != null) {
+                final List<HelloAssoOrderItem> items = orderResponse.getBody().getItems();
+                if (!CollectionUtils.isEmpty(items)) {
+                    final String fieldName = dotenv.get("HELLO_ASSO_EXTRA_MAIL_FIELD_NAME");
+                    if (fieldName == null) {
+                        LOGGER.debug("Value for HELLO_ASSO_EXTRA_MAIL_FIELD_NAME is not set");
+                        LOGGER.error("Error during HELLO_ASSO_EXTRA_MAIL_FIELD_NAME fetch: fieldName");
+                        return "field-error";
+                    }
+                    for (HelloAssoOrderItem item : items) {
+                        if (!CollectionUtils.isEmpty(item.getCustomFields())) {
+                            for (HelloAssoItemCustomField field : item.getCustomFields()) {
+                                if (fieldName.equals(field.getName())) {
+                                    return field.getAnswer();
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                LOGGER.error("Error during order fetch: {}", orderResponse);
+                return "order-error";
+            }
+        } else {
+            LOGGER.error("Error during payment fetch: {}", paymentResponse);
+            return "payment-error";
+        }
+        return "no-alternative-email-found";
     }
 }
