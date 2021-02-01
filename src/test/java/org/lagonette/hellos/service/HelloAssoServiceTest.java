@@ -259,6 +259,46 @@ class HelloAssoServiceTest {
     }
 
     @Test
+    void getExistingAlternateEmail_withWrongFieldName() throws JsonProcessingException {
+        // GIVEN
+        ObjectMapper objectMapper = new ObjectMapper();
+        HelloAssoToken accessTokenResponse = new HelloAssoToken("access", "type", "expire", "refresh");
+        mockBackEnd.enqueue(new MockResponse()
+                .setBody(objectMapper.writeValueAsString(accessTokenResponse))
+                .addHeader("Content-Type", "application/json"));
+        HelloAssoPayment payment = new HelloAssoPayment();
+        HelloAssoOrder order = new HelloAssoOrder();
+        order.setId(44);
+        HelloAssoOrderItem item = new HelloAssoOrderItem();
+        item.setName("itemName");
+        final HelloAssoItemCustomField alternateEmailField = new HelloAssoItemCustomField();
+        alternateEmailField.setName("wrong name");
+        alternateEmailField.setAnswer("alternate@email.fr");
+        item.setCustomFields(List.of(alternateEmailField));
+        order.setItems(List.of(item));
+        payment.setOrder(order);
+        mockBackEnd.enqueue(new MockResponse()
+                .setBody(objectMapper.writeValueAsString(payment))
+                .addHeader("Content-Type", "application/json"));
+
+        mockBackEnd.enqueue(new MockResponse()
+                .setBody(objectMapper.writeValueAsString(order))
+                .addHeader("Content-Type", "application/json"));
+
+        when(dotenv.get("HELLO_ASSO_CLIENT_ID")).thenReturn("id");
+        when(dotenv.get("HELLO_ASSO_CLIENT_SECRET")).thenReturn("such a secret");
+        when(dotenv.get("HELLO_ASSO_API_URL")).thenReturn(baseUrl);
+        when(dotenv.get("HELLO_ASSO_EXTRA_MAIL_FIELD_NAME")).thenReturn("fieldName");
+
+        // WHEN
+        final String alternativeEmailFromPayment = helloAssoService.getAlternativeEmailFromPayment(1);
+
+        // THEN
+        assertThat(alternativeEmailFromPayment).isEqualTo("alternate@email.fr");
+    }
+
+
+    @Test
     void getMissingAlternateEmail() throws JsonProcessingException {
         // GIVEN
         ObjectMapper objectMapper = new ObjectMapper();

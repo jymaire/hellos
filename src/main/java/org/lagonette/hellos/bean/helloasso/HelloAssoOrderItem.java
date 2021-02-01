@@ -27,4 +27,12 @@ public class HelloAssoOrderItem {
     public void setCustomFields(List<HelloAssoItemCustomField> customFields) {
         this.customFields = customFields;
     }
+
+    @Override
+    public String toString() {
+        return "HelloAssoOrderItem{" +
+                "name='" + name + '\'' +
+                ", customFields=" + customFields +
+                '}';
+    }
 }
