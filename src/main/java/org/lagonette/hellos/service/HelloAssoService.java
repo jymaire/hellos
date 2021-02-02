@@ -164,6 +164,8 @@ public class HelloAssoService {
         } catch (WebClientException exception) {
             LOGGER.error("error during data fetch : {}", exception.getCause().getMessage());
             return;
+        } finally {
+            disconnect(token);
         }
 
         Set<Payment> paymentsToSave = new HashSet<>();
@@ -190,7 +192,7 @@ public class HelloAssoService {
     }
 
     private String getHelloAssoAccessToken() throws IllegalAccessException {
-        LOGGER.debug("get access token");
+        LOGGER.info("get access token");
 
         MultiValueMap accessTokenBody = new LinkedMultiValueMap();
         accessTokenBody.add("client_id", dotenv.get("HELLO_ASSO_CLIENT_ID"));
@@ -218,56 +220,71 @@ public class HelloAssoService {
     }
 
     public String getAlternativeEmailFromPayment(int paymentId) {
-        String token;
+        String token = "";
         try {
             token = getHelloAssoAccessToken();
-        } catch (IllegalAccessException e) {
-            LOGGER.error("Error during token fetch: {}", e.getMessage());
-            return "token-error";
-        }
-        final ResponseEntity<HelloAssoPayment> paymentResponse = WebClient.builder().build().get()
-                .uri(dotenv.get("HELLO_ASSO_API_URL") + "v5/payments/" + paymentId)
-                .header("authorization", "Bearer " + token)
-                .retrieve()
-                .toEntity(HelloAssoPayment.class)
-                .block();
-
-        if (paymentResponse != null && paymentResponse.getStatusCode().is2xxSuccessful()
-                && paymentResponse.getBody() != null && paymentResponse.getBody().getOrder() != null) {
-            final int orderId = paymentResponse.getBody().getOrder().getId();
-            final ResponseEntity<HelloAssoOrder> orderResponse = WebClient.builder().build().get()
-                    .uri(dotenv.get("HELLO_ASSO_API_URL") + "v5/orders/" + orderId)
+            final ResponseEntity<HelloAssoPayment> paymentResponse = WebClient.builder().build().get()
+                    .uri(dotenv.get("HELLO_ASSO_API_URL") + "v5/payments/" + paymentId)
                     .header("authorization", "Bearer " + token)
                     .retrieve()
-                    .toEntity(HelloAssoOrder.class)
+                    .toEntity(HelloAssoPayment.class)
                     .block();
-            if (orderResponse != null && orderResponse.getStatusCode().is2xxSuccessful() && orderResponse.getBody() != null) {
-                final List<HelloAssoOrderItem> items = orderResponse.getBody().getItems();
-                if (!CollectionUtils.isEmpty(items)) {
-                    final String fieldName = dotenv.get("HELLO_ASSO_EXTRA_MAIL_FIELD_NAME");
-                    if (fieldName == null) {
-                        LOGGER.debug("Value for HELLO_ASSO_EXTRA_MAIL_FIELD_NAME is not set");
-                        LOGGER.error("Error during HELLO_ASSO_EXTRA_MAIL_FIELD_NAME fetch: fieldName");
-                        return "field-error";
-                    }
-                    for (HelloAssoOrderItem item : items) {
-                        if (!CollectionUtils.isEmpty(item.getCustomFields())) {
-                            for (HelloAssoItemCustomField field : item.getCustomFields()) {
-                                if (fieldName.equals(field.getName())) {
-                                    return field.getAnswer();
+
+            if (paymentResponse != null && paymentResponse.getStatusCode().is2xxSuccessful()
+                    && paymentResponse.getBody() != null && paymentResponse.getBody().getOrder() != null) {
+                final int orderId = paymentResponse.getBody().getOrder().getId();
+                LOGGER.info(" Order ID : {}", orderId);
+                final ResponseEntity<HelloAssoOrder> orderResponse = WebClient.builder().build().get()
+                        .uri(dotenv.get("HELLO_ASSO_API_URL") + "v5/orders/" + orderId)
+                        .header("authorization", "Bearer " + token)
+                        .retrieve()
+                        .toEntity(HelloAssoOrder.class)
+                        .block();
+                if (orderResponse != null && orderResponse.getStatusCode().is2xxSuccessful() && orderResponse.getBody() != null) {
+                    final List<HelloAssoOrderItem> items = orderResponse.getBody().getItems();
+                    if (!CollectionUtils.isEmpty(items)) {
+                        LOGGER.info("Item list : {}", items.toString());
+                        final String fieldName = dotenv.get("HELLO_ASSO_EXTRA_MAIL_FIELD_NAME");
+                        if (fieldName == null) {
+                            LOGGER.debug("Value for HELLO_ASSO_EXTRA_MAIL_FIELD_NAME is not set");
+                            LOGGER.error("Error during HELLO_ASSO_EXTRA_MAIL_FIELD_NAME fetch: fieldName");
+                            return "field-error";
+                        }
+                        for (HelloAssoOrderItem item : items) {
+                            if (!CollectionUtils.isEmpty(item.getCustomFields())) {
+                                for (HelloAssoItemCustomField field : item.getCustomFields()) {
+                                    if (fieldName.equals(field.getName()) || (field.getAnswer() != null && field.getAnswer().contains("@"))) {
+                                        LOGGER.info("alternative email found");
+                                        return field.getAnswer();
+                                    }
                                 }
                             }
                         }
                     }
+                } else {
+                    LOGGER.error("Error during order fetch: {}", orderResponse);
+                    return "order-error";
                 }
             } else {
-                LOGGER.error("Error during order fetch: {}", orderResponse);
-                return "order-error";
+                LOGGER.error("Error during payment fetch: {}", paymentResponse);
+                return "payment-error";
             }
-        } else {
-            LOGGER.error("Error during payment fetch: {}", paymentResponse);
-            return "payment-error";
+        } catch (IllegalAccessException e) {
+            LOGGER.error("Error during token fetch: {}", e.getMessage());
+            return "token-error";
+        } finally {
+            if (!StringUtils.isEmpty(token)) {
+                disconnect(token);
+            }
         }
+
         return "no-alternative-email-found";
+    }
+
+    public void disconnect(String token) {
+        final WebClient.ResponseSpec retrieve = WebClient.builder().build().get()
+                .uri(dotenv.get("HELLO_ASSO_API_URL") + "oauth2/disconnect")
+                .header("authorization", "Bearer " + token)
+                .retrieve();
     }
 }

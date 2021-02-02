@@ -32,4 +32,12 @@ public class HelloAssoItemCustomField {
         this.answer = answer;
     }
 
+    @Override
+    public String toString() {
+        return "HelloAssoItemCustomField{" +
+                "name='" + name + '\'' +
+                ", type=" + type +
+                ", answer='" + answer + '\'' +
+                '}';
+    }
 }

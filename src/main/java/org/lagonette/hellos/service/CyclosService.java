@@ -43,103 +43,111 @@ public class CyclosService {
     }
 
     public ProcessResult creditAccount(ProcessResult processResult, int id) {
-        Payment payment = paymentRepository.findById(id);
-        LOGGER.info("payment found in data base: {}", payment);
-        if (StatusPaymentEnum.success.equals(payment.getStatus())) {
-            LOGGER.error("Payment already proceeded");
-            processResult.getErrors().add("Paiement déjà effectué dans Cyclos");
-            processResult.setStatusPayment(StatusPaymentEnum.success);
-            return processResult;
-        }
-        String cyclosUrl = dotenv.get("CYCLOS_URL");
-        WebClient webClient = WebClient.builder()
-                .baseUrl(cyclosUrl)
-                .filter(ExchangeFilterFunctions
-                        .basicAuthentication(dotenv.get("CYCLOS_USER"), dotenv.get("CYCLOS_PWD")))
-                .build();
-        String accurateEmail = payment.getEmail();
-        ResponseEntity<List<CyclosUser>> getUserResponse = getCyclosUser(payment.getEmail(), webClient);
+        try {
+            Payment payment = paymentRepository.findById(id);
+            LOGGER.info("payment found in data base: {}", payment);
+            if (StatusPaymentEnum.success.equals(payment.getStatus())) {
+                LOGGER.error("Payment already proceeded");
+                processResult.getErrors().add("Paiement déjà effectué dans Cyclos");
+                processResult.setStatusPayment(StatusPaymentEnum.success);
+                return processResult;
+            }
+            String cyclosUrl = dotenv.get("CYCLOS_URL");
+            WebClient webClient = WebClient.builder()
+                    .baseUrl(cyclosUrl)
+                    .filter(ExchangeFilterFunctions
+                            .basicAuthentication(dotenv.get("CYCLOS_USER"), dotenv.get("CYCLOS_PWD")))
+                    .build();
+            String accurateEmail = payment.getEmail();
+            ResponseEntity<List<CyclosUser>> getUserResponse = getCyclosUser(payment.getEmail(), webClient);
 
-        if (isUserInvalid(getUserResponse)) {
-            // check if we have an alternative email in database
-            final String alternativeEmail = helloAssoService.getAlternativeEmailFromPayment(payment.getId());
-            if (alternativeEmail.contains("@")) {
-                getUserResponse = getCyclosUser(alternativeEmail, webClient);
-                if (isUserInvalid(getUserResponse)) {
-                    LOGGER.warn("Error getting Cyclos user from alternative email");
-                    processResult.getErrors().add("Erreur pendant la récupération de l'utilisateur dans Cyclos(email alternatif) ");
-                    processResult.setStatusPayment(StatusPaymentEnum.fail);
-                    return processResult;
-                }
-                accurateEmail = alternativeEmail;
-                // if user is valid, we just exit this part and continue the process, otherwise add an error and end process
-            } else {
-                processResult.setStatusPayment(StatusPaymentEnum.fail);
-                processResult.getErrors().add("Erreur pendant la récupération de l'utilisateur dans Cyclos, détails de la réponse " + alternativeEmail);
-                if (getUserResponse == null) {
-                    processResult.setStatusPayment(StatusPaymentEnum.fail);
-                    return processResult;
-                }
-                LOGGER.info("Status code is successful : {}", getUserResponse.getStatusCode().is2xxSuccessful());
-                if (getUserResponse.getBody() != null) {
-                    LOGGER.info("Body size : {}", getUserResponse.getBody().size());
-                }
-                LOGGER.debug("Body content : {}", getUserResponse.getBody());
-                if (!CollectionUtils.isEmpty(getUserResponse.getBody())) {
-                    LOGGER.info("User group : {}", getUserResponse.getBody().get(0).getGroup());
+            if (isUserInvalid(getUserResponse)) {
+                // check if we have an alternative email in database
+                final String alternativeEmail = helloAssoService.getAlternativeEmailFromPayment(payment.getId());
+                if (alternativeEmail.contains("@")) {
+                    getUserResponse = getCyclosUser(alternativeEmail, webClient);
+                    if (isUserInvalid(getUserResponse)) {
+                        LOGGER.warn("Error getting Cyclos user from alternative email");
+                        processResult.getErrors().add("Erreur pendant la récupération de l'utilisateur dans Cyclos(email alternatif) ");
+                        processResult.setStatusPayment(StatusPaymentEnum.fail);
+                        return processResult;
+                    }
+                    accurateEmail = alternativeEmail;
+                    // if user is valid, we just exit this part and continue the process, otherwise add an error and end process
                 } else {
-                    LOGGER.info("Body empty, can't debug group");
+                    LOGGER.info("alternative email error : {}", alternativeEmail);
+                    processResult.setStatusPayment(StatusPaymentEnum.fail);
+                    processResult.getErrors().add("Erreur pendant la récupération de l'utilisateur dans Cyclos, détails de la réponse " + alternativeEmail);
+                    if (getUserResponse == null) {
+                        processResult.setStatusPayment(StatusPaymentEnum.fail);
+                        return processResult;
+                    }
+                    LOGGER.info("Status code is successful : {}", getUserResponse.getStatusCode().is2xxSuccessful());
+                    if (getUserResponse.getBody() != null) {
+                        LOGGER.info("Body size : {}", getUserResponse.getBody().size());
+                    }
+                    LOGGER.debug("Body content : {}", getUserResponse.getBody());
+                    if (!CollectionUtils.isEmpty(getUserResponse.getBody())) {
+                        LOGGER.info("User group : {}", getUserResponse.getBody().get(0).getGroup());
+                    } else {
+                        LOGGER.info("Body empty, can't debug group");
+                    }
+                    processResult.setStatusPayment(StatusPaymentEnum.fail);
+                    return processResult;
                 }
+            }
+            CyclosUser cyclosUser = getUserResponse.getBody().get(0);
+            String type;
+
+            if (cyclosUser.getGroup().getInternalName().equals(dotenv.get("CYCLOS_GROUP_PRO_INTERNAL"))) {
+                type = dotenv.get("CYCLOS_EMISSION_PRO_INTERNAL");
+            } else if (cyclosUser.getGroup().getInternalName().equals(dotenv.get("CYCLOS_GROUP_PART_INTERNAL"))) {
+                type = dotenv.get("CYCLOS_EMISSION_PART_INTERNAL");
+            } else {
                 processResult.setStatusPayment(StatusPaymentEnum.fail);
                 return processResult;
             }
-        }
-        CyclosUser cyclosUser = getUserResponse.getBody().get(0);
-        String type;
+            // get last payment and check description
 
-        if (cyclosUser.getGroup().getInternalName().equals(dotenv.get("CYCLOS_GROUP_PRO_INTERNAL"))) {
-            type = dotenv.get("CYCLOS_EMISSION_PRO_INTERNAL");
-        } else if (cyclosUser.getGroup().getInternalName().equals(dotenv.get("CYCLOS_GROUP_PART_INTERNAL"))) {
-            type = dotenv.get("CYCLOS_EMISSION_PART_INTERNAL");
-        } else {
+            if (checkPaymentIsAlreadyDone(id, accurateEmail, webClient)) {
+                processResult.setStatusPayment(StatusPaymentEnum.fail);
+                processResult.getErrors().add("Paiement déjà réalisé dans Cyclos");
+                return processResult;
+            }
+            String paymentUrl;
+            if ("true".equals(configurationRepository.findById(PAYMENT_CYCLOS_ENABLED).orElse(new Configuration(PAYMENT_CYCLOS_ENABLED, "false")).getValue())) {
+                paymentUrl = "/system/payments";
+            } else {
+                paymentUrl = "/system/payments/preview";
+            }
+
+            ResponseEntity<List<CyclosPerformPaymentResponse>> paymentResponse = webClient.post()
+                    .uri(paymentUrl)
+                    .body(BodyInserters.fromValue(new CyclosPerformPayment(Float.toString(payment.getAmount()), accurateEmail, DESCRIPTION + payment.getId(), type)))
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .toEntityList(CyclosPerformPaymentResponse.class)
+                    .block();
+            LOGGER.debug("response : {}", paymentResponse);
+            if (paymentResponse == null || !paymentResponse.getStatusCode().is2xxSuccessful()) {
+                processResult.getErrors().add("Erreur technique lors du paiement dans Cyclos");
+                processResult.setStatusPayment(StatusPaymentEnum.fail);
+                return processResult;
+            }
+            if ("true".equals(configurationRepository.findById(PAYMENT_CYCLOS_ENABLED).orElse(new Configuration(PAYMENT_CYCLOS_ENABLED, "false")).getValue())) {
+                LOGGER.info("Payment successfully ended for payment {}", id);
+                processResult.setStatusPayment(StatusPaymentEnum.success);
+            } else {
+                LOGGER.info("Preview of payment successfully ended for payment {}", id);
+                processResult.setStatusPayment(StatusPaymentEnum.previewOK);
+            }
+            return processResult;
+        } catch (Exception exception) {
+            LOGGER.error("Unexpected error : {}", exception.getMessage());
+            processResult.getErrors().add("Erreur technique inattendue lors du paiement dans Cyclos");
             processResult.setStatusPayment(StatusPaymentEnum.fail);
             return processResult;
         }
-        // get last payment and check description
-
-        if (checkPaymentIsAlreadyDone(id, accurateEmail, webClient)) {
-            processResult.setStatusPayment(StatusPaymentEnum.fail);
-            processResult.getErrors().add("Paiement déjà réalisé dans Cyclos");
-            return processResult;
-        }
-        String paymentUrl;
-        if ("true".equals(configurationRepository.findById(PAYMENT_CYCLOS_ENABLED).orElse(new Configuration(PAYMENT_CYCLOS_ENABLED, "false")).getValue())) {
-            paymentUrl = "/system/payments";
-        } else {
-            paymentUrl = "/system/payments/preview";
-        }
-
-        ResponseEntity<List<CyclosPerformPaymentResponse>> paymentResponse = webClient.post()
-                .uri(paymentUrl)
-                .body(BodyInserters.fromValue(new CyclosPerformPayment(Float.toString(payment.getAmount()), accurateEmail, DESCRIPTION + payment.getId(), type)))
-                .accept(MediaType.APPLICATION_JSON)
-                .retrieve()
-                .toEntityList(CyclosPerformPaymentResponse.class)
-                .block();
-        LOGGER.debug("response : {}", paymentResponse);
-        if (paymentResponse == null || !paymentResponse.getStatusCode().is2xxSuccessful()) {
-            processResult.getErrors().add("Erreur technique lors du paiement dans Cyclos");
-            processResult.setStatusPayment(StatusPaymentEnum.fail);
-            return processResult;
-        }
-        if ("true".equals(configurationRepository.findById(PAYMENT_CYCLOS_ENABLED).orElse(new Configuration(PAYMENT_CYCLOS_ENABLED, "false")).getValue())) {
-            LOGGER.info("Payment successfully ended for payment {}", id);
-            processResult.setStatusPayment(StatusPaymentEnum.success);
-        } else {
-            LOGGER.info("Preview of payment successfully ended for payment {}", id);
-            processResult.setStatusPayment(StatusPaymentEnum.previewOK);
-        }
-        return processResult;
     }
 
     private boolean isUserInvalid(ResponseEntity<List<CyclosUser>> cyclosUserSecondAttempt) {

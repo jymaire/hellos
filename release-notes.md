@@ -1,5 +1,11 @@
 # Releases notes
 
+## 0.0.7 - my name is fix, bug fix
+
+- add some try catch to handle unexpected error during Cyclos payment processing
+- add disconnect step when dealing with Hello Asso API
+- change way to retrieve alternative email
+
 ## 0.0.6
 - add a button to manually fetch payments from Hello Asso (located in admin panel)
 - add some documentation with screenshots
