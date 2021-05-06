@@ -9,6 +9,7 @@ import org.lagonette.hellos.bean.ProcessResult;
 import org.lagonette.hellos.bean.StatusPaymentEnum;
 import org.lagonette.hellos.bean.helloasso.HelloAssoOrder;
 import org.lagonette.hellos.bean.helloasso.HelloAssoPayer;
+import org.lagonette.hellos.bean.helloasso.HelloAssoPaymentStateEnum;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoAmount;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotification;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotificationBody;
@@ -22,6 +23,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -97,6 +100,100 @@ class PaymentServiceTest {
         assertThat(paymentArgumentCaptor.getValue())
                 .extracting(Payment::getId, Payment::getDate, Payment::getAmount, Payment::getPayerFirstName, Payment::getPayerLastName)
                 .containsExactly(1, "2018-01-01T00:00:00", 2.4f, "prenom", "nom");
+    }
+
+    @Test
+    void handleNewPayment_toolate() throws IOException {
+        // GIVEN
+        ProcessResult processResult = new ProcessResult(StatusPaymentEnum.success, new HashSet<>());
+        HelloAssoPayer helloAssoPayer = new HelloAssoPayer();
+        helloAssoPayer.setEmail("email@here");
+        HelloAssoPaymentNotificationBody helloAssoPayment = new HelloAssoPaymentNotificationBody();
+        helloAssoPayment.setId(1);
+        helloAssoPayment.setAmount(new HelloAssoAmount(240));
+        helloAssoPayment.setDate("2018-01-01T00:00:00");
+        helloAssoPayer.setFirstName("prenom");
+        helloAssoPayer.setLastName("nom");
+        helloAssoPayment.setPayer(helloAssoPayer);
+        HelloAssoOrder order = new HelloAssoOrder();
+        order.setFormSlug("formSlug");
+        helloAssoPayment.setOrder(order);
+        HelloAssoPaymentNotification helloAssoPaymentNotification = new HelloAssoPaymentNotification("Payment", mapper.writeValueAsString(helloAssoPayment));
+
+        Map<Boolean, Notification> result = new HashMap<>();
+        Notification notification = Notification.NotificationBuilder.aNotification()
+                .withAmount(helloAssoPayment.getAmount().getTotal())
+                .withDate(helloAssoPayment.getDate())
+                .withEmail(helloAssoPayment.getPayer().getEmail())
+                .withFirstName(helloAssoPayment.getPayer().getFirstName())
+                .withName(helloAssoPayment.getPayer().getLastName())
+                .withFormSlug(helloAssoPayment.getOrder().getFormSlug())
+                .withId(helloAssoPayment.getId())
+                .build();
+        result.put(true, notification);
+        when(helloAssoService.isValidPayment(helloAssoPaymentNotification)).thenReturn(result);
+        when(paymentRepository.findById(1)).thenReturn(null);
+        when(configurationRepository.findById(PAYMENT_AUTOMATIC_ENABLED)).thenReturn(Optional.of(new Configuration(PAYMENT_AUTOMATIC_ENABLED, "true")));
+
+        // WHEN
+        paymentService.handleNewPayment(processResult, mapper.writeValueAsString(helloAssoPaymentNotification));
+
+        // THEN
+        ArgumentCaptor<Payment> paymentArgumentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository, times(1)).save(paymentArgumentCaptor.capture());
+        assertThat(paymentArgumentCaptor.getValue())
+                .extracting(Payment::getId, Payment::getDate, Payment::getAmount, Payment::getPayerFirstName, Payment::getPayerLastName)
+                .containsExactly(1, "2018-01-01T00:00:00", 2.4f, "prenom", "nom");
+        verify(mailService, times(1)).sendEmail(null, "[Hellos] Paiement en retard",
+                "Un paiement a été reçu en retard.\nId : 1");
+    }
+
+    @Test
+    void handleNewPayment_waiting() throws IOException {
+        // GIVEN
+        ProcessResult processResult = new ProcessResult(StatusPaymentEnum.success, new HashSet<>());
+        HelloAssoPayer helloAssoPayer = new HelloAssoPayer();
+        helloAssoPayer.setEmail("email@here");
+        HelloAssoPaymentNotificationBody helloAssoPayment = new HelloAssoPaymentNotificationBody();
+        helloAssoPayment.setId(1);
+        helloAssoPayment.setAmount(new HelloAssoAmount(240));
+        final String now = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME);
+        helloAssoPayment.setDate(now);
+        helloAssoPayer.setFirstName("prenom");
+        helloAssoPayer.setLastName("nom");
+        helloAssoPayment.setPayer(helloAssoPayer);
+        HelloAssoOrder order = new HelloAssoOrder();
+        order.setFormSlug("formSlug");
+        helloAssoPayment.setOrder(order);
+        HelloAssoPaymentNotification helloAssoPaymentNotification = new HelloAssoPaymentNotification("Payment", mapper.writeValueAsString(helloAssoPayment));
+
+        Map<Boolean, Notification> result = new HashMap<>();
+        Notification notification = Notification.NotificationBuilder.aNotification()
+                .withAmount(helloAssoPayment.getAmount().getTotal())
+                .withDate(helloAssoPayment.getDate())
+                .withEmail(helloAssoPayment.getPayer().getEmail())
+                .withFirstName(helloAssoPayment.getPayer().getFirstName())
+                .withName(helloAssoPayment.getPayer().getLastName())
+                .withFormSlug(helloAssoPayment.getOrder().getFormSlug())
+                .withId(helloAssoPayment.getId())
+                .withState(HelloAssoPaymentStateEnum.Waiting.name())
+                .build();
+        result.put(true, notification);
+        when(helloAssoService.isValidPayment(helloAssoPaymentNotification)).thenReturn(result);
+        when(paymentRepository.findById(1)).thenReturn(null);
+        when(configurationRepository.findById(PAYMENT_AUTOMATIC_ENABLED)).thenReturn(Optional.of(new Configuration(PAYMENT_AUTOMATIC_ENABLED, "true")));
+
+        // WHEN
+        paymentService.handleNewPayment(processResult, mapper.writeValueAsString(helloAssoPaymentNotification));
+
+        // THEN
+        ArgumentCaptor<Payment> paymentArgumentCaptor = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository, times(1)).save(paymentArgumentCaptor.capture());
+        assertThat(paymentArgumentCaptor.getValue())
+                .extracting(Payment::getId, Payment::getDate, Payment::getAmount, Payment::getPayerFirstName, Payment::getPayerLastName)
+                .containsExactly(1, now, 2.4f, "prenom", "nom");
+        verify(mailService, times(1)).sendEmail(null, "[Hellos] Paiement en attente",
+                "Un paiement a été reçu avec l'état 'Attente'.\nId : 1");
     }
 
     @Test

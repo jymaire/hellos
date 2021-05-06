@@ -5,6 +5,7 @@ import io.github.cdimascio.dotenv.Dotenv;
 import org.lagonette.hellos.bean.Notification;
 import org.lagonette.hellos.bean.ProcessResult;
 import org.lagonette.hellos.bean.StatusPaymentEnum;
+import org.lagonette.hellos.bean.helloasso.HelloAssoPaymentStateEnum;
 import org.lagonette.hellos.bean.helloasso.notification.HelloAssoPaymentNotification;
 import org.lagonette.hellos.entity.Configuration;
 import org.lagonette.hellos.entity.Payment;
@@ -15,6 +16,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 
 import static org.lagonette.hellos.service.ConfigurationService.MAIL_RECIPIENT;
@@ -23,6 +26,7 @@ import static org.lagonette.hellos.service.ConfigurationService.PAYMENT_AUTOMATI
 @Component
 public class PaymentService {
     private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
+    public static final long NUMBER_LATE_HOURS_ACCEPTED = 12l;
 
     private final ConfigurationRepository configurationRepository;
     private final PaymentRepository paymentRepository;
@@ -69,6 +73,31 @@ public class PaymentService {
             Payment paymentSaved = paymentRepository.save(payment);
 
             if ("true".equals(configurationRepository.findById(PAYMENT_AUTOMATIC_ENABLED).orElse(new Configuration(PAYMENT_AUTOMATIC_ENABLED, "false")).getValue())) {
+                // Check date
+                LocalDateTime paymentDate = null;
+                try {
+                    paymentDate = LocalDateTime.parse(payment.getDate(), DateTimeFormatter.ISO_DATE_TIME);
+
+                } catch (Exception e) {
+                    LOGGER.error("Error parsing date in {}", payment);
+                }
+                if (paymentDate != null && LocalDateTime.now().isAfter(paymentDate.plusHours(NUMBER_LATE_HOURS_ACCEPTED))) {
+                    final Configuration mailRecipientConfiguration = configurationRepository.findById(MAIL_RECIPIENT).orElse(new Configuration(MAIL_RECIPIENT, dotenv.get("MAIL_RECIPIENT")));
+
+                    mailService.sendEmail(mailRecipientConfiguration.getValue(), "[Hellos] Paiement en retard",
+                            "Un paiement a été reçu en retard.\nId : " + payment.getId());
+                    processResult.setStatusPayment(StatusPaymentEnum.tooLate);
+                    return processResult;
+                }
+                if (HelloAssoPaymentStateEnum.Waiting.name().equals(notification.getState())) {
+                    final Configuration mailRecipientConfiguration = configurationRepository.findById(MAIL_RECIPIENT).orElse(new Configuration(MAIL_RECIPIENT, dotenv.get("MAIL_RECIPIENT")));
+
+                    mailService.sendEmail(mailRecipientConfiguration.getValue(), "[Hellos] Paiement en attente",
+                            "Un paiement a été reçu avec l'état 'Attente'.\nId : " + payment.getId());
+                    processResult.setStatusPayment(StatusPaymentEnum.waiting);
+                    return processResult;
+                }
+
                 LOGGER.info("automatic payment to be proceed");
                 processResult = creditCyclosAccount(processResult, paymentSaved);
                 final Configuration mailRecipientConfiguration = configurationRepository.findById(MAIL_RECIPIENT).orElse(new Configuration(MAIL_RECIPIENT, dotenv.get("MAIL_RECIPIENT")));
