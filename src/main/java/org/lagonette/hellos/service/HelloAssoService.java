@@ -108,7 +108,7 @@ public class HelloAssoService {
         // convert date to an easier format to read for human
         String dateWithEasyToReadFormat = formatDate(notification.getDate());
         notification.setDate(dateWithEasyToReadFormat);
-
+        notification.setState(helloAssoPayment.getState());
         end.put(true, notification);
         return end;
     }
@@ -146,6 +146,10 @@ public class HelloAssoService {
             return true;
         }
         if (!HelloAssoPaymentStateEnum.Authorized.name().equals(helloAssoPayment.getState())) {
+            if (HelloAssoPaymentStateEnum.Waiting.name().contains(helloAssoPayment.getState())) {
+                LOGGER.warn("Late payment : {}", helloAssoPayment.getId());
+                return false;
+            }
             LOGGER.error("Wrong state {}", helloAssoPayment);
             return true;
         }

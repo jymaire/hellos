@@ -8,6 +8,7 @@ public class Notification {
     private String email;
     private String formSlug;
     private String date;
+    private String state;
     private int amount;
 
     public Notification() {
@@ -69,6 +70,13 @@ public class Notification {
         this.amount = amount;
     }
 
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
 
     public static final class NotificationBuilder {
         private int id;
@@ -77,6 +85,7 @@ public class Notification {
         private String email;
         private String formSlug;
         private String date;
+        private String state;
         private int amount;
 
         private NotificationBuilder() {
@@ -116,6 +125,11 @@ public class Notification {
             return this;
         }
 
+        public NotificationBuilder withState(String state) {
+            this.state = state;
+            return this;
+        }
+
         public NotificationBuilder withAmount(int amount) {
             this.amount = amount;
             return this;
@@ -129,6 +143,7 @@ public class Notification {
             notification.setEmail(email);
             notification.setFormSlug(formSlug);
             notification.setDate(date);
+            notification.setState(state);
             notification.setAmount(amount);
             return notification;
         }

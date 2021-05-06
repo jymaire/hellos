@@ -1,5 +1,10 @@
 # Releases notes
 
+## 0.0.8
+
+- fix management of "waiting" payment
+- prevent late payments to be automatically proceed
+
 ## 0.0.7 - my name is fix, bug fix
 
 - add some try catch to handle unexpected error during Cyclos payment processing
