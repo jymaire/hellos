@@ -23,6 +23,18 @@ Deux autres boutons sont disponibles : un pour aller vers le panneau d'administr
 
 ![liste paiements](images/liste-paiements.png)
 
+### Statuts possibles pour un paiement
+Un paiement peut être dans différents statuts : 
+ - À faire : Paiement à réaliser manuellement
+ - Montant trop haut : Montant trop haut par rapport à la limite définie dans le .env
+ - En retard : Hello Asso a envoyé le paiement avec trop de retard (défini dans le .env)
+ - Reactiver les paiements pour effectuer le paiement : le paiement automatique a été désactivé
+ - Succès : Paiement crédité dans Cyclos
+ - Succès (automatique) : Paiement crédité dans Cyclos
+ - Echec : Erreur lors du paiement
+ - En attente : Paiement reçu à l'état "Waiting", à effectuer manuellement
+
+
 ## Panneau d'administration
 Il permet principalement de mettre à jour différentes configurations :
 - Activation des paiements de Cyclos
