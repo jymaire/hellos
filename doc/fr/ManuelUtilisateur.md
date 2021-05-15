@@ -28,7 +28,7 @@ Un paiement peut être dans différents statuts :
  - À faire : Paiement à réaliser manuellement
  - Montant trop haut : Montant trop haut par rapport à la limite définie dans le .env
  - En retard : Hello Asso a envoyé le paiement avec trop de retard (défini dans le .env)
- - Reactiver les paiements pour effectuer le paiement : le paiement automatique a été désactivé
+ - Reactiver les paiements pour effectuer le paiement : le paiement vers Cyclos a été désactivé
  - Succès : Paiement crédité dans Cyclos
  - Succès (automatique) : Paiement crédité dans Cyclos
  - Echec : Erreur lors du paiement
