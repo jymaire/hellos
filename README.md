@@ -16,6 +16,10 @@ This jar is an executable file, so you can execute it. To register it as service
 
 You can also create a Docker image by running `mvn spring-boot:build-image` command.
 
+## Logging
+
+You can define the location of the log file with the argument `--logging.file.name=/path/to/file.log` after the `./hellos.jar`command. Otherwise, it will be displayed in the standard output.
+
 ## Dev guide
 
 To have some data at start up, you can activate `dev` Spring profile by adding `-Dspring.profiles.active=dev` to the VM options.
