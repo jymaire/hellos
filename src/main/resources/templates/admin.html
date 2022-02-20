@@ -46,6 +46,17 @@
         </div>
         <div><input class="submit" type="submit" value="Valider configuration"/></div>
     </form>
+
+    <br>
+    <div class="un">
+        <form method="POST" th:action="@{/upload-csv-file}" enctype="multipart/form-data">
+            <div>
+                <label for="file">Import d'un fichier CSV CollectOnline</label>
+                <input type="file" name="file" class="form-control-file" id="file" accept=".csv">
+            </div>
+            <button type="submit" class="btn btn-primary">Import</button>
+        </form>
+    </div>
 </div>
 </body>
 </html>
