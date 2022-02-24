@@ -32,9 +32,43 @@ class CollectOnlineServiceTest {
     void importPaymentsFromCSV() {
         // GIVEN
         List<Payment> list = new ArrayList<>();
+        // No exe, no cha -> ko
+        list.add(Payment.PaymentBuilder.aPayment()
+                .withReference("110")
+                .withDateOperation("15/02/21")
+                .withMontant("4,5")
+                .withPrenom("prénom")
+                .withNom("Nom")
+                .withEmail("test@test.fr")
+                .build());
+        // exe, cha -> ok
         list.add(Payment.PaymentBuilder.aPayment()
                 .withReference("111")
                 .withDateOperation("15/02/21")
+                .withStatutEcheance("Exécutée")
+                .withCodeCategorieEcheancier("Cha")
+                .withMontant("4,5")
+                .withPrenom("prénom")
+                .withNom("Nom")
+                .withEmail("test@test.fr")
+                .build());
+        // no exe, cha -> ko
+        list.add(Payment.PaymentBuilder.aPayment()
+                .withReference("112")
+                .withDateOperation("15/02/21")
+                .withStatutEcheance("aa")
+                .withCodeCategorieEcheancier("Cha")
+                .withMontant("4,5")
+                .withPrenom("prénom")
+                .withNom("Nom")
+                .withEmail("test@test.fr")
+                .build());
+        // exe, no cha -> ko
+        list.add(Payment.PaymentBuilder.aPayment()
+                .withReference("113")
+                .withDateOperation("15/02/21")
+                .withStatutEcheance("Exécutée")
+                .withCodeCategorieEcheancier("autre")
                 .withMontant("4,5")
                 .withPrenom("prénom")
                 .withNom("Nom")
@@ -50,7 +84,7 @@ class CollectOnlineServiceTest {
         assertThat(saved).isNotEmpty();
         assertThat(saved.size()).isEqualTo(1);
         assertThat(saved.get(0))
-                .extracting(org.lagonette.hellos.entity.Payment::getId,org.lagonette.hellos.entity.Payment::getDate,org.lagonette.hellos.entity.Payment::getAmount,org.lagonette.hellos.entity.Payment::getPayerFirstName,org.lagonette.hellos.entity.Payment::getPayerLastName,org.lagonette.hellos.entity.Payment::getEmail)
-                .containsExactly(111, "15/02/21", 4.5f,"prénom", "Nom", "test@test.fr");
+                .extracting(org.lagonette.hellos.entity.Payment::getId, org.lagonette.hellos.entity.Payment::getDate, org.lagonette.hellos.entity.Payment::getAmount, org.lagonette.hellos.entity.Payment::getPayerFirstName, org.lagonette.hellos.entity.Payment::getPayerLastName, org.lagonette.hellos.entity.Payment::getEmail)
+                .containsExactly(111, "15/02/21", 4.5f, "prénom", "Nom", "test@test.fr");
     }
 }

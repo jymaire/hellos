@@ -15,7 +15,8 @@ import java.util.Locale;
 @Service
 public class CollectOnlineService {
     private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
-
+    private final String EXEC = "Exécutée";
+    private final String CHANGE = "Cha";
     private final PaymentRepository paymentRepository;
 
     public CollectOnlineService(PaymentRepository paymentRepository) {
@@ -29,13 +30,15 @@ public class CollectOnlineService {
         for (Payment payment : paymentList) {
             try {
                 float montant = format.parse(payment.getMontant()).floatValue();
-                paymentsToSave.add(new org.lagonette.hellos.entity.Payment(
-                        Integer.parseInt(payment.getReference()),
-                        payment.getDateOperation(),
-                        montant,
-                        payment.getPrenom(),
-                        payment.getNom(),
-                        payment.getEmail()));
+                if (EXEC.equals(payment.getStatutEcheance()) && payment.getCodeCategorieEcheancier() != null && payment.getCodeCategorieEcheancier().contains(CHANGE)) {
+                    paymentsToSave.add(new org.lagonette.hellos.entity.Payment(
+                            Integer.parseInt(payment.getReference()),
+                            payment.getDateOperation(),
+                            montant,
+                            payment.getPrenom(),
+                            payment.getNom(),
+                            payment.getEmail()));
+                }
             } catch (ParseException e) {
                 LOGGER.error(e.toString());
             }
