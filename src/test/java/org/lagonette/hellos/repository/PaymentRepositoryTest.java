@@ -2,6 +2,7 @@ package org.lagonette.hellos.repository;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.lagonette.hellos.bean.StatusPaymentEnum;
 import org.lagonette.hellos.entity.Payment;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -32,6 +33,24 @@ class PaymentRepositoryTest {
         assertThat(withDateOlderThan).isNotEmpty();
         assertThat(withDateOlderThan.size()).isEqualTo(1);
         assertThat(withDateOlderThan.get(0)).isEqualTo(1);
+    }
+
+    @Test
+    void shouldFindPaymentByStatus() {
+        // GIVEN
+        Payment payment1 = Payment.PaymentBuilder.aPayment().withId(1).withInsertionDate(LocalDateTime.parse("2020-02-03T00:10:22")).build();
+        payment1.setStatus(StatusPaymentEnum.success);
+        paymentRepository.save(payment1);
+        Payment payment2 = Payment.PaymentBuilder.aPayment().withId(2).withInsertionDate(LocalDateTime.parse("2020-02-05T00:10:22")).build();
+        payment2.setStatus(StatusPaymentEnum.todo);
+        paymentRepository.save(payment2);
+
+        // WHEN
+        List<Payment> withDateOlderThan = paymentRepository.getByStatus(StatusPaymentEnum.todo);
+        // THEN
+        assertThat(withDateOlderThan).isNotEmpty();
+        assertThat(withDateOlderThan.size()).isEqualTo(1);
+        assertThat(withDateOlderThan.get(0).getId()).isEqualTo(2);
     }
 
     @Test

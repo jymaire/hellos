@@ -1,6 +1,7 @@
 package org.lagonette.hellos.repository;
 
 import com.sun.istack.NotNull;
+import org.lagonette.hellos.bean.StatusPaymentEnum;
 import org.lagonette.hellos.entity.Payment;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -33,4 +34,7 @@ public interface PaymentRepository extends CrudRepository<Payment, Long> {
     @Modifying
     @Query("DELETE FROM Payment p WHERE p.id = ?1")
     void deleteById(int paymentIds);
+
+    @Query("SELECT p FROM Payment p WHERE p.status = ?1")
+    List<Payment> getByStatus(StatusPaymentEnum status);
 }

@@ -14,10 +14,12 @@ import org.lagonette.hellos.repository.PaymentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Map;
 
 import static org.lagonette.hellos.service.ConfigurationService.MAIL_RECIPIENT;
@@ -146,6 +148,14 @@ public class PaymentService {
             String body = "Liste des erreurs pour le paiement " + paymentId + ": \n " + processResult.getErrors().toString();
             String ERROR_SUBJECT = "[Hellos] Erreur lors du traitement";
             mailService.sendEmail(configurationRepository.findById(MAIL_RECIPIENT).get().getValue(), ERROR_SUBJECT, body);
+        }
+    }
+
+    @Transactional
+    public void creditAll() {
+        final List<Payment> paymentsToDo = paymentRepository.getByStatus(StatusPaymentEnum.todo);
+        for(Payment payment : paymentsToDo){
+            creditCyclosAccount(new ProcessResult(), payment);
         }
     }
 }
