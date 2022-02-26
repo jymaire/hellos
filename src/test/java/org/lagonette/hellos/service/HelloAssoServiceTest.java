@@ -73,7 +73,8 @@ class HelloAssoServiceTest {
 
     @BeforeEach
     void before() throws JsonProcessingException {
-        baseUrl = String.format("http://localhost:%s", mockBackEnd.getPort());
+        final int port = mockBackEnd.getPort();
+        baseUrl = String.format("http://localhost:%d/", port);
         HelloAssoOrder helloAssoOrder = new HelloAssoOrder();
         helloAssoOrder.setFormSlug("form-slug");
         helloAssoPaymentBody = new HelloAssoPaymentNotificationBody();
