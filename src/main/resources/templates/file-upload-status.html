@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <title>Status upload</title>
+    <link rel="stylesheet" th:href="@{/style/file-upload-status.css}"/>
+    <link rel="shortcut icon" th:href="@{/images/favicon.ico}" type="image/x-icon"/>
+    <meta content="width=device-width, initial-scale=1" name="viewport"/>
+</head>
+<body>
+<h1>Status import  :</h1>
+<p><span th:text="${status}"/> <span th:text="${error}"/> : <span th:text="${message}"/></p>
+<br>
+<br>
+<a href="/list">Retour à la page des paiements</a>
+</body>
+</html>
