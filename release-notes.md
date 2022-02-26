@@ -1,5 +1,12 @@
 # Releases notes
 
+## 0.1.0
+
+- add import from CollectOnline
+- add button to import all "to do" payments
+- upgrade to Java 17 and other libs
+- add some documentation about logging
+
 ## 0.0.8
 
 - fix management of "waiting" payment
