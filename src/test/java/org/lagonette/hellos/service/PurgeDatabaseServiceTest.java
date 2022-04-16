@@ -1,5 +1,7 @@
 package org.lagonette.hellos.service;
 
+import io.github.cdimascio.dotenv.Dotenv;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.lagonette.hellos.repository.PaymentRepository;
@@ -19,8 +21,17 @@ class PurgeDatabaseServiceTest {
     @Mock
     private PaymentRepository paymentRepository;
 
+    @Mock
+    private Dotenv dotenv;
+
+
     @InjectMocks
     private PurgeDatabaseService purgeDatabaseService;
+
+    @BeforeEach
+    void before(){
+        when(dotenv.get("DATABASE_RETENTION_PAYMENT_DAY")).thenReturn("7");
+    }
 
     @Test
     void purgeDatabase() {
