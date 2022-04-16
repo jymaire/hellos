@@ -1,9 +1,9 @@
 package org.lagonette.hellos.service;
 
+import io.github.cdimascio.dotenv.Dotenv;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,12 +16,11 @@ public class PurgeDatabaseService {
     private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 
     private final PaymentRepository paymentRepository;
+    private final Dotenv dotenv;
 
-    @Value("${database.retention.payment.days}")
-    private int nbOfDaysForPayments;
-
-    public PurgeDatabaseService(PaymentRepository paymentRepository) {
+    public PurgeDatabaseService(PaymentRepository paymentRepository, Dotenv dotenv) {
         this.paymentRepository = paymentRepository;
+         this.dotenv = dotenv;
     }
 
     @Transactional
@@ -29,6 +28,7 @@ public class PurgeDatabaseService {
     public void purgeDatabase() {
         LOGGER.info("Begin of the database purge");
 
+        long nbOfDaysForPayments = Long.parseLong(dotenv.get("DATABASE_RETENTION_PAYMENT_DAY"));
         // Payment purge
         List<Integer> paymentsToDelete = paymentRepository.findIdsByInsertionDateBefore(LocalDateTime.now().minusDays(nbOfDaysForPayments));
         int paymentsSize = paymentsToDelete.size();
