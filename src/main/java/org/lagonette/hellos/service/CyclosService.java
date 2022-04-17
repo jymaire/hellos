@@ -21,6 +21,8 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunctions;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.lagonette.hellos.service.ConfigurationService.PAYMENT_CYCLOS_ENABLED;
@@ -34,6 +36,7 @@ public class CyclosService {
     private final ConfigurationRepository configurationRepository;
     private final PaymentRepository paymentRepository;
     private final Dotenv dotenv;
+    private List<String> particulierCyclosGroups = new ArrayList<>();
 
     public CyclosService(HelloAssoService helloAssoService, ConfigurationRepository configurationRepository, PaymentRepository paymentRepository, Dotenv dotenv) {
         this.helloAssoService = helloAssoService;
@@ -43,6 +46,10 @@ public class CyclosService {
     }
 
     public ProcessResult creditAccount(ProcessResult processResult, int id) {
+        if (particulierCyclosGroups.isEmpty() && dotenv.get("CYCLOS_GROUP_PART_INTERNAL") != null) {
+            particulierCyclosGroups.addAll(Arrays.asList(dotenv.get("CYCLOS_GROUP_PART_INTERNAL").split(",")));
+        }
+
         try {
             Payment payment = paymentRepository.findById(id);
             LOGGER.info("payment found in data base: {}", payment);
@@ -101,7 +108,7 @@ public class CyclosService {
 
             if (cyclosUser.getGroup().getInternalName().equals(dotenv.get("CYCLOS_GROUP_PRO_INTERNAL"))) {
                 type = dotenv.get("CYCLOS_EMISSION_PRO_INTERNAL");
-            } else if (cyclosUser.getGroup().getInternalName().equals(dotenv.get("CYCLOS_GROUP_PART_INTERNAL"))) {
+            } else if (particulierCyclosGroups.contains(cyclosUser.getGroup().getInternalName())) {
                 type = dotenv.get("CYCLOS_EMISSION_PART_INTERNAL");
             } else {
                 processResult.setStatusPayment(StatusPaymentEnum.fail);
