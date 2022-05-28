@@ -13,12 +13,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Controller
 public class UploadController {
+    public static final char SEPARATOR = ';';
     private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 
     private final CollectOnlineService collectOnlineService;
@@ -36,7 +37,12 @@ public class UploadController {
             model.addAttribute("status", false);
         } else {
             try {
-                final CsvToBean build = getBuild(file);
+                InputStream inputStream = file.getInputStream();
+                final List<String> lines = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))
+                        .lines().toList();
+                String csvUpdated = fixCsvFile(lines);
+
+                final CsvToBean build = getBuild(csvUpdated);
                 List beans = build.parse();
                 collectOnlineService.importPaymentsFromCSV(beans);
                 model.addAttribute("status", true);
@@ -51,11 +57,53 @@ public class UploadController {
         return "file-upload-status";
     }
 
-    private CsvToBean getBuild(MultipartFile file) throws IOException {
+    /**
+     * File from collect online is not a valid CSV file, so we fix it
+     * @param lines
+     * @return
+     */
+    protected String fixCsvFile(List<String> lines) {
+        StringBuilder csvUpdatedBuild = new StringBuilder();
+
+        boolean firstLine = true;
+        for (String line : lines) {
+            if (firstLine) {
+                int count = 0;
+                for (int i = 0; i < line.length(); i++) {
+                    if (line.charAt(i) == SEPARATOR) {
+                        count++;
+                    }
+                }
+                /*
+                 * L'export collect online produit un csv non valide. Le nombre d'en tete est de 56 alors que le
+                 * nombre de colonnes de données est de 57
+                 * Donc correction de la structure de la ligne d'en tete en rajoutant un point virgule
+                 */
+                if (count == 56) {
+                    line = line + ";";
+                }
+                firstLine = false;
+            }
+            /**
+             *  Deuxième particularité des exports CSV de collectonline : parfois on trouve des "=" dans les données, au tout début.
+             *  Ainsi que """ à la fin.
+             *  Donc deuxième correction, remplacer les "=" par des " afin d'avoir un format valide
+             *  Exemple d'extrait d'une ligne de données : [...];"=""CAM pour 20 euros""";[...]
+             */
+            line = line.replaceAll("\"=\"\"", "\"");
+            line = line.replaceAll("\"\"\"", "\"");
+            csvUpdatedBuild.append(line).append(System.getProperty("line.separator"));
+            LOGGER.debug(line);
+        }
+        String csvUpdated = csvUpdatedBuild.toString();
+        return csvUpdated;
+    }
+
+    private CsvToBean getBuild(String file) throws IOException {
         final HeaderColumnNameMappingStrategy headerColumnNameMappingStrategy = new HeaderColumnNameMappingStrategy();
         headerColumnNameMappingStrategy.setType(Payment.class);
-        return new CsvToBeanBuilder(new InputStreamReader(file.getInputStream()))
-                .withSeparator(';')
+        return new CsvToBeanBuilder(new StringReader(file))
+                .withSeparator(SEPARATOR)
                 .withMappingStrategy(headerColumnNameMappingStrategy)
                 .build();
     }

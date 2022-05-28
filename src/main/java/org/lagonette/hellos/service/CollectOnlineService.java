@@ -1,5 +1,6 @@
 package org.lagonette.hellos.service;
 
+import io.github.cdimascio.dotenv.Dotenv;
 import org.lagonette.hellos.bean.collectonline.Payment;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.slf4j.Logger;
@@ -16,21 +17,23 @@ import java.util.Locale;
 public class CollectOnlineService {
     private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
     private final String EXEC = "Exécutée";
-    private final String CHANGE = "Cha";
     private final PaymentRepository paymentRepository;
+    private final Dotenv dotenv;
 
-    public CollectOnlineService(PaymentRepository paymentRepository) {
+    public CollectOnlineService(PaymentRepository paymentRepository, Dotenv dotenv) {
         this.paymentRepository = paymentRepository;
+        this.dotenv = dotenv;
     }
 
     public void importPaymentsFromCSV(List<Payment> paymentList) {
         NumberFormat format = NumberFormat.getInstance(Locale.FRANCE);
         List<org.lagonette.hellos.entity.Payment> paymentsToSave = new ArrayList<>();
 
+        final String colChangeKeyword = dotenv.get("COL_CHANGE_KEYWORD");
         for (Payment payment : paymentList) {
             try {
                 float montant = format.parse(payment.getMontant()).floatValue();
-                if (EXEC.equals(payment.getStatutEcheance()) && payment.getCodeCategorieEcheancier() != null && payment.getCodeCategorieEcheancier().contains(CHANGE)) {
+                if (EXEC.equals(payment.getStatutEcheance()) && payment.getCodeCategorieEcheancier() != null && (colChangeKeyword == null || payment.getCodeCategorieEcheancier().contains(colChangeKeyword))) {
                     paymentsToSave.add(new org.lagonette.hellos.entity.Payment(
                             Integer.parseInt(payment.getReference()),
                             payment.getDateOperation(),
