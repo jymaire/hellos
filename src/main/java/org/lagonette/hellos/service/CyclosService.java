@@ -158,6 +158,9 @@ public class CyclosService {
     }
 
     private boolean isUserInvalid(ResponseEntity<List<CyclosUser>> cyclosUserSecondAttempt) {
+        if (cyclosUserSecondAttempt != null ) {
+            LOGGER.info(cyclosUserSecondAttempt.getStatusCode().toString());
+        }
         return cyclosUserSecondAttempt == null || cyclosUserSecondAttempt.getBody() == null || !cyclosUserSecondAttempt.getStatusCode().is2xxSuccessful() || cyclosUserSecondAttempt.getBody().size() != 1 || cyclosUserSecondAttempt.getBody().get(0).getGroup() == null;
     }
 
@@ -184,6 +187,7 @@ public class CyclosService {
         LOGGER.debug("Last description : {}", getLastTransaction.getBody());
         String expectedMessage = DESCRIPTION + id;
         if (!expectedMessage.equals(getLastTransaction.getBody().get(0).getDescription())) {
+            LOGGER.info("le paiement n'a pas déjà été effectué");
             return false;
         }
         return true;

@@ -216,6 +216,7 @@ public class HelloAssoService {
                 .bodyToMono(HelloAssoToken.class)
                 .block();
 
+        LOGGER.info("Token fetched");
         if (accessTokenResponse == null || accessTokenResponse.getAccess_token() == null) {
             LOGGER.error("Erreur lors de la récupération du token : \n{}", accessTokenResponse);
             throw new IllegalAccessException("First access token error");
@@ -227,6 +228,10 @@ public class HelloAssoService {
         String token = "";
         try {
             token = getHelloAssoAccessToken();
+            LOGGER.info("about to ask payment to Hello Asso for payment : {}", paymentId);
+            if (token == null || token.equals("")) {
+                LOGGER.error("Hello Asso Token is empty !");
+            }
             final ResponseEntity<HelloAssoPayment> paymentResponse = WebClient.builder().build().get()
                     .uri(dotenv.get("HELLO_ASSO_API_URL") + "v5/payments/" + paymentId)
                     .header("authorization", "Bearer " + token)
