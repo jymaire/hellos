@@ -27,11 +27,14 @@ import org.springframework.web.reactive.function.client.WebClientException;
 import reactor.netty.http.client.HttpClient;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.TimeoutException;
 
 import static org.lagonette.hellos.service.ConfigurationService.MAIL_RECIPIENT;
+import static org.lagonette.hellos.service.PaymentService.REQUEST_TIMEOUT;
 
 @Service
 public class HelloAssoService {
@@ -168,6 +171,13 @@ public class HelloAssoService {
         } catch (WebClientException exception) {
             LOGGER.error("error during data fetch : {}", exception.getCause().getMessage());
             return;
+        } catch (Exception e) {
+            if (e.getCause() instanceof TimeoutException) {
+                LOGGER.error("timeout during data fetch ");
+            } else {
+                LOGGER.error("unknown during data fetch : {}", e.getCause().getMessage());
+            }
+            return;
         } finally {
             disconnect(token);
         }
@@ -192,6 +202,7 @@ public class HelloAssoService {
                 .header("authorization", "Bearer " + accessToken)
                 .retrieve()
                 .toEntity(HelloAssoFormPayments.class)
+                .timeout(Duration.ofSeconds(REQUEST_TIMEOUT))
                 .block();
     }
 
@@ -214,6 +225,7 @@ public class HelloAssoService {
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .retrieve()
                 .bodyToMono(HelloAssoToken.class)
+                .timeout(Duration.ofSeconds(REQUEST_TIMEOUT))
                 .block();
 
         LOGGER.info("Token fetched");
@@ -238,6 +250,7 @@ public class HelloAssoService {
                     .header("authorization", "Bearer " + token)
                     .retrieve()
                     .toEntity(HelloAssoPayment.class)
+                    .timeout(Duration.ofSeconds(REQUEST_TIMEOUT))
                     .block();
 
             if (paymentResponse != null && paymentResponse.getStatusCode().is2xxSuccessful()
@@ -249,6 +262,7 @@ public class HelloAssoService {
                         .header("authorization", "Bearer " + token)
                         .retrieve()
                         .toEntity(HelloAssoOrder.class)
+                        .timeout(Duration.ofSeconds(REQUEST_TIMEOUT))
                         .block();
                 if (orderResponse != null && orderResponse.getStatusCode().is2xxSuccessful() && orderResponse.getBody() != null) {
                     final List<HelloAssoOrderItem> items = orderResponse.getBody().getItems();
@@ -282,6 +296,14 @@ public class HelloAssoService {
         } catch (IllegalAccessException e) {
             LOGGER.error("Error during token fetch: {}", e.getMessage());
             return "token-error";
+        } catch (Exception e) {
+            if (e.getCause() instanceof TimeoutException) {
+                LOGGER.error("timeout during data fetch ");
+                return "timeout-error";
+            } else {
+                LOGGER.error("unknown during data fetch : {}", e.getCause().getMessage());
+                return "unkown-error";
+            }
         } finally {
             if (StringUtils.hasLength(token)) {
                 LOGGER.info("disconnect token");
