@@ -67,10 +67,12 @@ public class CyclosService {
                     .build();
             String accurateEmail = payment.getEmail();
             ResponseEntity<List<CyclosUser>> getUserResponse = getCyclosUser(payment.getEmail(), webClient);
-
+            LOGGER.info("first cyclos get user status code : {}", getUserResponse.getStatusCode());
+            LOGGER.info("first cyclos get user body : {}", getUserResponse.getBody());
             if (isUserInvalid(getUserResponse)) {
                 // check if we have an alternative email in database
                 final String alternativeEmail = helloAssoService.getAlternativeEmailFromPayment(payment.getId());
+                LOGGER.info("Alternative email found : {}", alternativeEmail);
                 if (alternativeEmail.contains("@")) {
                     getUserResponse = getCyclosUser(alternativeEmail, webClient);
                     if (isUserInvalid(getUserResponse)) {
@@ -158,6 +160,9 @@ public class CyclosService {
     }
 
     private boolean isUserInvalid(ResponseEntity<List<CyclosUser>> cyclosUserSecondAttempt) {
+        if (cyclosUserSecondAttempt != null) {
+            LOGGER.info(cyclosUserSecondAttempt.getStatusCode().toString());
+        }
         return cyclosUserSecondAttempt == null || cyclosUserSecondAttempt.getBody() == null || !cyclosUserSecondAttempt.getStatusCode().is2xxSuccessful() || cyclosUserSecondAttempt.getBody().size() != 1 || cyclosUserSecondAttempt.getBody().get(0).getGroup() == null;
     }
 
@@ -184,6 +189,7 @@ public class CyclosService {
         LOGGER.debug("Last description : {}", getLastTransaction.getBody());
         String expectedMessage = DESCRIPTION + id;
         if (!expectedMessage.equals(getLastTransaction.getBody().get(0).getDescription())) {
+            LOGGER.info("le paiement n'a pas déjà été effectué, donc à faire");
             return false;
         }
         return true;

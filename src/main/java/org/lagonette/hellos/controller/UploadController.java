@@ -49,6 +49,7 @@ public class UploadController {
                 model.addAttribute("message", "L'import a été réalisé avec succès");
             } catch (Exception ex) {
                 LOGGER.error(ex.getStackTrace().toString());
+                LOGGER.error(ex.toString());
                 model.addAttribute("message", "An error occurred while processing the CSV file." + ex.getCause());
                 model.addAttribute("status", false);
             }
@@ -59,6 +60,7 @@ public class UploadController {
 
     /**
      * File from collect online is not a valid CSV file, so we fix it
+     *
      * @param lines
      * @return
      */

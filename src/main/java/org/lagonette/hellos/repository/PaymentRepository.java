@@ -32,6 +32,10 @@ public interface PaymentRepository extends CrudRepository<Payment, Long> {
     void deleteById(List<Integer> paymentIds);
 
     @Modifying
+    @Query("DELETE FROM Payment p")
+    void deleteAll();
+
+    @Modifying
     @Query("DELETE FROM Payment p WHERE p.id = ?1")
     void deleteById(int paymentIds);
 
