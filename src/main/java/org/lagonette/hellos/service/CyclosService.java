@@ -21,11 +21,14 @@ import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunctions;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 import static org.lagonette.hellos.service.ConfigurationService.PAYMENT_CYCLOS_ENABLED;
+import static org.lagonette.hellos.service.PaymentService.REQUEST_TIMEOUT;
 
 @Component
 public class CyclosService {
@@ -136,6 +139,7 @@ public class CyclosService {
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve()
                     .toEntityList(CyclosPerformPaymentResponse.class)
+                    .timeout(Duration.ofSeconds(REQUEST_TIMEOUT))
                     .block();
             LOGGER.debug("response : {}", paymentResponse);
             if (paymentResponse == null || !paymentResponse.getStatusCode().is2xxSuccessful()) {
@@ -151,9 +155,14 @@ public class CyclosService {
                 processResult.setStatusPayment(StatusPaymentEnum.previewOK);
             }
             return processResult;
-        } catch (Exception exception) {
-            LOGGER.error("Unexpected error : {}", exception.getMessage());
-            processResult.getErrors().add("Erreur technique inattendue lors du paiement dans Cyclos");
+        } catch (Exception e) {
+            if (e.getCause() instanceof TimeoutException) {
+                LOGGER.error("timeout during cyclos payment ");
+                processResult.getErrors().add("Timeout lors du paiement dans Cyclos");
+            } else {
+                LOGGER.error("Unexpected error : {}", e.getMessage());
+                processResult.getErrors().add("Erreur technique inattendue 1 lors du paiement dans Cyclos");
+            }
             processResult.setStatusPayment(StatusPaymentEnum.fail);
             return processResult;
         }
@@ -172,6 +181,7 @@ public class CyclosService {
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .toEntityList(CyclosUser.class)
+                .timeout(Duration.ofSeconds(REQUEST_TIMEOUT))
                 .block();
     }
 
@@ -181,6 +191,7 @@ public class CyclosService {
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
                 .toEntityList(CyclosTransaction.class)
+                .timeout(Duration.ofSeconds(REQUEST_TIMEOUT))
                 .block();
 
         if (getLastTransaction == null || getLastTransaction.getBody() == null || getLastTransaction.getBody().isEmpty()) {

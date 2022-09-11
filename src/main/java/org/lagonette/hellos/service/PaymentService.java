@@ -29,6 +29,7 @@ import static org.lagonette.hellos.service.ConfigurationService.PAYMENT_AUTOMATI
 public class PaymentService {
     private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
     public static final long NUMBER_LATE_HOURS_ACCEPTED = 12l;
+    public static final long REQUEST_TIMEOUT = 60;
 
     private final ConfigurationRepository configurationRepository;
     private final PaymentRepository paymentRepository;
