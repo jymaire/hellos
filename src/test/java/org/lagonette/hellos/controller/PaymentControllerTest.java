@@ -3,6 +3,7 @@ package org.lagonette.hellos.controller;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.lagonette.hellos.bean.ProcessResult;
+import org.lagonette.hellos.entity.Payment;
 import org.lagonette.hellos.repository.PaymentRepository;
 import org.lagonette.hellos.service.CyclosService;
 import org.lagonette.hellos.service.HelloAssoService;
@@ -12,8 +13,10 @@ import org.mockito.Mock;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.ui.ConcurrentModel;
 
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(SpringExtension.class)
 class PaymentControllerTest {
@@ -42,6 +45,26 @@ class PaymentControllerTest {
         verify(paymentRepository).findAll();
         verifyNoMoreInteractions(paymentRepository);
     }
+
+    @Test
+    void shouldFindAllPaymentAndOrderThem() {
+        // GIVEN
+        final ConcurrentModel model = new ConcurrentModel();
+        when(paymentRepository.findAll()).thenReturn(List.of(Payment.PaymentBuilder.aPayment().withId(2).build(),
+                Payment.PaymentBuilder.aPayment().withId(1).build(),
+                Payment.PaymentBuilder.aPayment().withId(3).build()
+        ));
+        // WHEN
+        paymentController.payments(model);
+
+        // THEN
+        verify(paymentRepository).findAll();
+        verifyNoMoreInteractions(paymentRepository);
+        assertThat(((List<Payment>) model.get("payments")).get(0).getId()).isEqualTo(3);
+        assertThat(((List<Payment>) model.get("payments")).get(1).getId()).isEqualTo(2);
+        assertThat(((List<Payment>) model.get("payments")).get(2).getId()).isEqualTo(1);
+    }
+
 
     @Test
     void shouldCreditAccount() {

@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Controller
@@ -25,7 +27,8 @@ public class PaymentController {
 
     @RequestMapping(value = "/list", method = RequestMethod.GET)
     public String payments(Model model) {
-        List<Payment> all = paymentRepository.findAll();
+        List<Payment> all = new ArrayList<>(paymentRepository.findAll());
+        Collections.sort(all);
         model.addAttribute("payments", all);
         return "list";
     }

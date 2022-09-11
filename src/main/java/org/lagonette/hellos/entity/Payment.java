@@ -11,7 +11,7 @@ import java.util.Objects;
 import static org.lagonette.hellos.bean.StatusPaymentEnum.todo;
 
 @Entity
-public class Payment {
+public class Payment implements Comparable<Payment>{
     public static final int ERROR_LENGTH = 700;
     @Id
     private int id;
@@ -120,6 +120,18 @@ public class Payment {
                 ", error='" + error + '\'' +
                 ", email='" + email + '\'' +
                 '}';
+    }
+
+
+    @Override
+    public int compareTo(Payment p) {
+        if(id > p.id){
+            return -1;
+        }
+        if(id < p.id){
+            return 1;
+        }
+        return 0;
     }
 
     public static final class PaymentBuilder {
