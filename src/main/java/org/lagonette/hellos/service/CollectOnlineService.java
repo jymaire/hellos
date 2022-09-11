@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.text.NumberFormat;
 import java.text.ParseException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -31,19 +32,27 @@ public class CollectOnlineService {
 
         final String colChangeKeyword = dotenv.get("COL_CHANGE_KEYWORD");
         for (Payment payment : paymentList) {
-            try {
-                float montant = format.parse(payment.getMontant()).floatValue();
-                if (EXEC.equals(payment.getStatutEcheance()) && payment.getCodeCategorieEcheancier() != null && (colChangeKeyword == null || payment.getCodeCategorieEcheancier().contains(colChangeKeyword))) {
-                    paymentsToSave.add(new org.lagonette.hellos.entity.Payment(
-                            Integer.parseInt(payment.getReference()),
-                            payment.getDateOperation(),
-                            montant,
-                            payment.getPrenom(),
-                            payment.getNom(),
-                            payment.getEmail()));
+            if (payment != null && payment.getMontant() != null) {
+                try {
+                    float montant = format.parse(payment.getMontant()).floatValue();
+                    if (EXEC.equals(payment.getStatutEcheance()) && payment.getCodeCategorieEcheancier() != null && (colChangeKeyword == null || payment.getCodeCategorieEcheancier().contains(colChangeKeyword))) {
+                        // some trouble of the encoding of COL file, so some workaround
+                        if (payment.getDateOperation() == null) {
+                            payment.setDateOperation(LocalDateTime.now().toString());
+                        }
+                        paymentsToSave.add(new org.lagonette.hellos.entity.Payment(
+                                Integer.parseInt(payment.getReference()),
+                                payment.getDateOperation(),
+                                montant,
+                                payment.getPrenom(),
+                                payment.getNom(),
+                                payment.getEmail()));
+                    }
+                } catch (ParseException e) {
+                    LOGGER.error(e.toString());
                 }
-            } catch (ParseException e) {
-                LOGGER.error(e.toString());
+            } else {
+                LOGGER.warn("payment vide !");
             }
         }
         paymentRepository.saveAll(paymentsToSave);

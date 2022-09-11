@@ -110,12 +110,17 @@ public class Payment {
     @Override
     public String toString() {
         return "Payment{" +
-                "id='" + id + '\'' +
+                "id=" + id +
                 ", date='" + date + '\'' +
                 ", amount=" + amount +
+                ", payerFirstName='" + payerFirstName + '\'' +
+                ", payerLastName='" + payerLastName + '\'' +
+                ", insertionDate=" + insertionDate +
+                ", status=" + status +
+                ", error='" + error + '\'' +
+                ", email='" + email + '\'' +
                 '}';
     }
-
 
     public static final class PaymentBuilder {
         private int id;
