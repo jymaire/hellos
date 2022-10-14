@@ -5,7 +5,7 @@ The aim of this project is to listen to a Hello Asso account to add credit on a 
 The business context is local currencies.
 
 ## Technical pre requisites
-- Java 11
+- Java 17
 - Maven 3
 
 ## Packaging guide
